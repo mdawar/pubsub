@@ -126,3 +126,35 @@ func TestBrokerNumSubsAfterSubscriptions(t *testing.T) {
 		t.Errorf("want %d final subscriptions, got %d", wantFinalSubs, got)
 	}
 }
+
+func TestBrokerNumSubsDecreasesAfterUnsubscribe(t *testing.T) {
+	t.Parallel()
+
+	broker := pubsub.NewBroker[string, string]()
+
+	assertSubs := func(want int) {
+		if got := broker.NumSubs(); want != got {
+			t.Fatalf("want subs count %d, got %d", want, got)
+		}
+	}
+
+	topic := "testing"
+
+	// First subscription.
+	sub1 := broker.Subscribe(topic)
+	assertSubs(1)
+
+	// Add 10 more subscriptions on the same topic.
+	for range 10 {
+		broker.Subscribe(topic)
+	}
+	assertSubs(11)
+
+	// Remove 1 subscription.
+	broker.Unsubscribe(sub1)
+	assertSubs(10)
+}
+
+// TODO: test NumTopics decreases after all subscriptions are removed.
+// TODO: test NumSubs does not decrease if not all subscriptions are removed.
+// TODO: test NumSubs decreases if all subscriptions are removed manually.
