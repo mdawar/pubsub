@@ -10,7 +10,7 @@ import (
 func TestBrokerInitialState(t *testing.T) {
 	t.Parallel()
 
-	broker := pubsub.NewBroker[string]()
+	broker := pubsub.NewBroker[string, string]()
 
 	wantSubs := 0
 	wantTopics := 0
@@ -27,7 +27,7 @@ func TestBrokerInitialState(t *testing.T) {
 func TestBrokerSubscribeOnSameTopicReturnsNewChannel(t *testing.T) {
 	t.Parallel()
 
-	broker := pubsub.NewBroker[int]()
+	broker := pubsub.NewBroker[string, int]()
 
 	topic := "testing"
 	sub1 := broker.Subscribe(topic)
@@ -41,7 +41,7 @@ func TestBrokerSubscribeOnSameTopicReturnsNewChannel(t *testing.T) {
 func TestBrokerSubscribeWithCapacityOnSameTopicReturnsNewChannel(t *testing.T) {
 	t.Parallel()
 
-	broker := pubsub.NewBroker[int]()
+	broker := pubsub.NewBroker[string, int]()
 
 	topic := "testing"
 	sub1 := broker.SubscribeWithCapacity(1, topic)
@@ -55,7 +55,7 @@ func TestBrokerSubscribeWithCapacityOnSameTopicReturnsNewChannel(t *testing.T) {
 func TestBrokerSubscribeUnbufferedChannelCapacity(t *testing.T) {
 	t.Parallel()
 
-	broker := pubsub.NewBroker[int]()
+	broker := pubsub.NewBroker[string, int]()
 
 	sub := broker.Subscribe("testing")
 	wantCap := 0
@@ -68,7 +68,7 @@ func TestBrokerSubscribeUnbufferedChannelCapacity(t *testing.T) {
 func TestBrokerSubscribeBufferedChannelCapacity(t *testing.T) {
 	t.Parallel()
 
-	broker := pubsub.NewBroker[int]()
+	broker := pubsub.NewBroker[string, int]()
 
 	wantCap := 10
 	sub := broker.SubscribeWithCapacity(wantCap, "testing")
@@ -81,7 +81,7 @@ func TestBrokerSubscribeBufferedChannelCapacity(t *testing.T) {
 func TestBrokerNumTopicsAfterSubscriptions(t *testing.T) {
 	t.Parallel()
 
-	broker := pubsub.NewBroker[int]()
+	broker := pubsub.NewBroker[string, int]()
 	wantTopics := 10
 
 	for i := range wantTopics {
@@ -105,7 +105,7 @@ func TestBrokerNumTopicsAfterSubscriptions(t *testing.T) {
 func TestBrokerNumSubsAfterSubscriptions(t *testing.T) {
 	t.Parallel()
 
-	broker := pubsub.NewBroker[int]()
+	broker := pubsub.NewBroker[string, int]()
 	wantSubs := 10
 	wantFinalSubs := wantSubs * 2
 

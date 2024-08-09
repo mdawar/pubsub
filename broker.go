@@ -1,11 +1,11 @@
 package pubsub
 
 // Message represents a message delivered by the broker to a subscriber.
-type Message[T any] struct {
+type Message[T any, P any] struct {
 	// Topic is the topic on which the message is published.
-	Topic string
+	Topic T
 	// Payload holds the published value.
-	Payload T
+	Payload P
 }
 
 // Broker represents a message broker.
@@ -15,42 +15,42 @@ type Message[T any] struct {
 // of messages to specific topics or broadcasting to all subscribers.
 //
 // The Broker supports concurrent operations.
-type Broker[T any] struct {
+type Broker[T comparable, P any] struct {
 	// topics holds the topics and their subscriptions as a slice.
-	topics map[string][]chan Message[T]
+	topics map[T][]chan Message[T, P]
 	// subs holds all of the subscription channels.
-	subs []chan Message[T]
+	subs []chan Message[T, P]
 }
 
 // NewBroker creates a new message broker instance.
-func NewBroker[T any]() *Broker[T] {
-	return &Broker[T]{
-		topics: make(map[string][]chan Message[T]),
+func NewBroker[T comparable, P any]() *Broker[T, P] {
+	return &Broker[T, P]{
+		topics: make(map[T][]chan Message[T, P]),
 	}
 }
 
 // NumSubs returns the number of registered subscriptions.
-func (b *Broker[T]) NumSubs() int {
+func (b *Broker[T, P]) NumSubs() int {
 	return len(b.subs)
 }
 
 // NumTopics returns the total number of topics registered on the broker.
-func (b *Broker[T]) NumTopics() int {
+func (b *Broker[T, P]) NumTopics() int {
 	return len(b.topics)
 }
 
 // Subscribe creates a subscription for the specified topics.
 //
 // The created subscription channel is unbuffered (capacity = 0).
-func (b *Broker[T]) Subscribe(topics ...string) <-chan Message[T] {
+func (b *Broker[T, P]) Subscribe(topics ...T) <-chan Message[T, P] {
 	return b.SubscribeWithCapacity(0, topics...)
 }
 
 // Subscribe creates a subscription for the specified topics with the specified capacity.
 //
 // The capacity specifies the subscription channel's buffer capacity.
-func (b *Broker[T]) SubscribeWithCapacity(capacity int, topics ...string) <-chan Message[T] {
-	sub := make(chan Message[T], capacity)
+func (b *Broker[T, P]) SubscribeWithCapacity(capacity int, topics ...T) <-chan Message[T, P] {
+	sub := make(chan Message[T, P], capacity)
 
 	for _, topic := range topics {
 		b.topics[topic] = append(b.topics[topic], sub)
@@ -64,18 +64,18 @@ func (b *Broker[T]) SubscribeWithCapacity(capacity int, topics ...string) <-chan
 // Unsubscribe removes a subscription for the specified topics.
 //
 // All topic subscriptions are removed if none are specified.
-func (b *Broker[T]) Unsubscribe(sub <-chan Message[T], topics ...string) {}
+func (b *Broker[T, P]) Unsubscribe(sub <-chan Message[T, P], topics ...T) {}
 
 // Publish publishes a message on the topic with the specified payload.
-func (b *Broker[T]) Publish(topic string, payload T) {}
+func (b *Broker[T, P]) Publish(topic T, payload P) {}
 
 // TryPublish publishes a message on the topic with the specified payload if the subscription's
 // channel buffer is not full.
-func (b *Broker[T]) TryPublish(topic string, payload T) {}
+func (b *Broker[T, P]) TryPublish(topic T, payload P) {}
 
 // Broadcast publishes a message with the specified payload on all the subscriptions.
-func (b *Broker[T]) Broadcast(payload T) {}
+func (b *Broker[T, P]) Broadcast(payload P) {}
 
 // TryBroadcast publishes a message with the specified payload on all the subscriptions if the
 // subscription's buffer is not full.
-func (b *Broker[T]) TryBroadcast(payload T) {}
+func (b *Broker[T, P]) TryBroadcast(payload P) {}

@@ -15,8 +15,8 @@ go get -u github.com/mdawar/pubsub
 ```go
 import "github.com/mdawar/pubsub"
 
-// Create a broker and specify the message payload type.
-broker := pubsub.NewBroker[string]()
+// Create a broker and specify the topics type and the message payloads type.
+broker := pubsub.NewBroker[string, string]()
 ```
 
 #### Create a Subscription
