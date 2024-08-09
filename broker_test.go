@@ -225,39 +225,58 @@ func TestBrokerNumSubsDecreasesAfterUnsubscribe(t *testing.T) {
 func TestBrokerPublish(t *testing.T) {
 	t.Parallel()
 
-	broker := pubsub.NewBroker[string, string]()
-	topic := "testing"
-	payload := "Test Message"
-
-	// Subscription with unbuffered channel.
-	sub := broker.Subscribe(topic)
-
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		// Blocks until all subscribers receive the message.
-		broker.Publish(topic, payload)
-	}()
-
-	// Wait for the message.
-	select {
-	case got := <-sub:
-		if topic != got.Topic {
-			t.Errorf("want message topic %q, got %q", topic, got.Topic)
-		}
-
-		if payload != got.Payload {
-			t.Errorf("want message payload %q, got %q", payload, got.Payload)
-		}
-	case <-time.After(time.Second):
-		t.Error("timed out waiting for message")
+	cases := map[string]int{
+		"1 subscriber":    1,
+		"2 subscribers":   2,
+		"10 subscribers":  10,
+		"100 subscribers": 100,
 	}
 
-	// Wait for Publish to return.
-	select {
-	case <-done:
-	case <-time.After(time.Second):
-		t.Error("timed out waiting for Publish to return")
+	for name, count := range cases {
+		t.Run(name, func(t *testing.T) {
+			broker := pubsub.NewBroker[string, string]()
+			topic := "testing"
+			payload := "Test Message"
+
+			// Subscriptions.
+			var subs []<-chan pubsub.Message[string, string]
+
+			// Create the subscriptions.
+			for range count {
+				sub := broker.Subscribe(topic)
+				subs = append(subs, sub)
+			}
+
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				// Blocks until all subscribers receive the message.
+				broker.Publish(topic, payload)
+			}()
+
+			// Wait for messages to be received on the subscription channels.
+			for _, sub := range subs {
+				select {
+				case got := <-sub:
+					if topic != got.Topic {
+						t.Errorf("want message topic %q, got %q", topic, got.Topic)
+					}
+
+					if payload != got.Payload {
+						t.Errorf("want message payload %q, got %q", payload, got.Payload)
+					}
+				case <-time.After(time.Second):
+					t.Error("timed out waiting for message")
+				}
+			}
+
+			// Wait for Publish to return.
+			select {
+			case <-done:
+			case <-time.After(time.Second):
+				t.Error("timed out waiting for Publish to return")
+			}
+		})
 	}
 }
 
