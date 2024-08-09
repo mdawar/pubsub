@@ -280,7 +280,25 @@ func TestBrokerPublish(t *testing.T) {
 	}
 }
 
-// TODO: test publish on unregistered topic does not block.
+func TestBrokerPublishWithoutSubscriptions(t *testing.T) {
+	t.Parallel()
+
+	broker := pubsub.NewBroker[string, string]()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		// A publish without any subscriptions should not block.
+		broker.Publish("testing", "Message")
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Error("timed out waiting for Publish to return")
+	}
+}
+
 // TODO: test NumTopics decreases after all subscriptions are removed.
 // TODO: test NumSubs does not decrease if not all subscriptions are removed.
 // TODO: test NumSubs decreases if all subscriptions are removed manually.
