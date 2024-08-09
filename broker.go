@@ -23,12 +23,12 @@ func NewBroker[T any]() *Broker[T] {
 }
 
 // NumSubs returns the number of registered subscriptions.
-func NumSubs() int {
+func (b *Broker[T]) NumSubs() int {
 	return 0
 }
 
 // NumTopics returns the total number of topics registered on the broker.
-func NumTopics() int {
+func (b *Broker[T]) NumTopics() int {
 	return 0
 }
 
@@ -43,7 +43,7 @@ func (b *Broker[T]) Subscribe(topics ...string) <-chan Message[T] {
 //
 // The capacity specifies the subscription channel's buffer capacity.
 func (b *Broker[T]) SubscribeWithCapacity(capacity int, topics ...string) <-chan Message[T] {
-	sub := make(chan Message[T])
+	sub := make(chan Message[T], capacity)
 	return sub
 }
 
