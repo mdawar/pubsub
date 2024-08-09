@@ -169,6 +169,72 @@ func TestBrokerNumTopicsAfterSubscriptions(t *testing.T) {
 	}
 }
 
+func TestBrokerNumTopicsDecreasesAfterUnsubscribe(t *testing.T) {
+	t.Parallel()
+
+	broker := pubsub.NewBroker[string, int]()
+
+	assertTopics := func(want int) {
+		t.Helper()
+		if got := broker.NumTopics(); want != got {
+			t.Fatalf("want topics count %d, got %d", want, got)
+		}
+	}
+
+	assertTopics(0)
+
+	sub := broker.Subscribe("a", "b", "c")
+	assertTopics(3)
+
+	broker.Unsubscribe(sub, "a")
+	assertTopics(2)
+
+	broker.Unsubscribe(sub, "b")
+	assertTopics(1)
+
+	broker.Unsubscribe(sub, "c")
+	assertTopics(0)
+}
+
+func TestBrokerNumTopicsWithSubscribersOnSameTopic(t *testing.T) {
+	t.Parallel()
+
+	broker := pubsub.NewBroker[string, string]()
+
+	assertTopics := func(want int) {
+		t.Helper()
+		if got := broker.NumTopics(); want != got {
+			t.Fatalf("want topics count %d, got %d", want, got)
+		}
+	}
+
+	assertTopics(0)
+
+	var subs []<-chan pubsub.Message[string, string]
+	topic := "testing"
+	count := 10
+
+	// Subscribe on the same topic.
+	for range count {
+		sub := broker.Subscribe(topic)
+		subs = append(subs, sub)
+		assertTopics(1)
+	}
+
+	lastSubIndex := len(subs) - 1
+
+	// Remove all of the subscriptons and keep 1.
+	for _, sub := range subs[:lastSubIndex] {
+		broker.Unsubscribe(sub, topic)
+		assertTopics(1)
+	}
+
+	// Remove the last subscription.
+	lastSub := subs[lastSubIndex]
+	broker.Unsubscribe(lastSub, topic)
+	assertTopics(0)
+}
+
 func TestBrokerNumSubsAfterSubscriptions(t *testing.T) {
 	t.Parallel()
 
@@ -200,6 +266,7 @@ func TestBrokerNumSubsDecreasesAfterUnsubscribe(t *testing.T) {
 	broker := pubsub.NewBroker[string, string]()
 
 	assertSubs := func(want int) {
+		t.Helper()
 		if got := broker.NumSubs(); want != got {
 			t.Fatalf("want subs count %d, got %d", want, got)
 		}
@@ -332,6 +399,30 @@ func TestBrokerPublishWithBufferedSubscription(t *testing.T) {
 	}
 }
 
-// TODO: test NumTopics decreases after all subscriptions are removed.
+func TestBrokerPublishAfterUnsubscribe(t *testing.T) {
+	t.Parallel()
+
+	broker := pubsub.NewBroker[string, string]()
+	topic := "testing"
+	payload := "Test Message"
+
+	sub := broker.Subscribe(topic)
+	broker.Unsubscribe(sub, topic)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		// Should not block after unsubscribe.
+		broker.Publish(topic, payload)
+	}()
+
+	// Wait for Publish to return.
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Error("timed out waiting for Publish to return")
+	}
+}
+
 // TODO: test NumSubs does not decrease if not all subscriptions are removed.
 // TODO: test NumSubs decreases if all subscriptions are removed manually.

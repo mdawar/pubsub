@@ -80,7 +80,21 @@ func (b *Broker[T, P]) SubscribeWithCapacity(capacity int, topics ...T) <-chan M
 //
 // All topic subscriptions are removed if none are specified.
 func (b *Broker[T, P]) Unsubscribe(sub <-chan Message[T, P], topics ...T) {
-	// TODO: remove from topics map after adding test.
+	for _, topic := range topics {
+		// Topic subscribers.
+		subscribers := b.topics[topic]
+		for i, s := range subscribers {
+			if s == sub {
+				// Remove the topic if this is the only subscription.
+				if len(subscribers) == 1 {
+					delete(b.topics, topic)
+				} else {
+					// Remove the subscription channel.
+					b.topics[topic] = append(subscribers[:i], subscribers[i+1:]...)
+				}
+			}
+		}
+	}
 
 	// TODO: only remove if subscriptions on all topics are removed.
 	for i, s := range b.subs {
