@@ -91,7 +91,18 @@ func (b *Broker[T, P]) Unsubscribe(sub <-chan Message[T, P], topics ...T) {
 }
 
 // Publish publishes a message on the topic with the specified payload.
-func (b *Broker[T, P]) Publish(topic T, payload P) {}
+//
+// The payload will be discarded if the there are no subscribers on the topic.
+//
+// This method will block if any of the subscription channels buffer is full.
+// This can be used to guarantee message delivery.
+func (b *Broker[T, P]) Publish(topic T, payload P) {
+	subs := b.topics[topic]
+
+	for _, sub := range subs {
+		sub <- Message[T, P]{Topic: topic, Payload: payload}
+	}
+}
 
 // TryPublish publishes a message on the topic with the specified payload if the subscription's
 // channel buffer is not full.

@@ -3,6 +3,7 @@ package pubsub_test
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 
@@ -221,6 +222,46 @@ func TestBrokerNumSubsDecreasesAfterUnsubscribe(t *testing.T) {
 	assertSubs(10)
 }
 
+func TestBrokerPublish(t *testing.T) {
+	t.Parallel()
+
+	broker := pubsub.NewBroker[string, string]()
+	topic := "testing"
+	payload := "Test Message"
+
+	// Subscription with unbuffered channel.
+	sub := broker.Subscribe(topic)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		// Blocks until all subscribers receive the message.
+		broker.Publish(topic, payload)
+	}()
+
+	// Wait for the message.
+	select {
+	case got := <-sub:
+		if topic != got.Topic {
+			t.Errorf("want message topic %q, got %q", topic, got.Topic)
+		}
+
+		if payload != got.Payload {
+			t.Errorf("want message payload %q, got %q", payload, got.Payload)
+		}
+	case <-time.After(time.Second):
+		t.Error("timed out waiting for message")
+	}
+
+	// Wait for Publish to return.
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Error("timed out waiting for Publish to return")
+	}
+}
+
+// TODO: test publish on unregistered topic does not block.
 // TODO: test NumTopics decreases after all subscriptions are removed.
 // TODO: test NumSubs does not decrease if not all subscriptions are removed.
 // TODO: test NumSubs decreases if all subscriptions are removed manually.
