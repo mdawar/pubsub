@@ -4,23 +4,42 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/mdawar/pubsub"
 )
 
-func TestBrokerInitialState(t *testing.T) {
+func TestBrokerInitialNumSubs(t *testing.T) {
 	t.Parallel()
 
 	broker := pubsub.NewBroker[string, string]()
+	want := 0
 
-	wantSubs := 0
-	wantTopics := 0
-
-	if got := broker.NumSubs(); wantSubs != got {
-		t.Errorf("want %d initial broker subscriptions, got %d", wantSubs, got)
+	if got := broker.NumSubs(); want != got {
+		t.Errorf("want %d subscriptions, got %d", want, got)
 	}
+}
 
-	if got := broker.NumTopics(); wantTopics != got {
-		t.Errorf("want %d initial broker topics, got %d", wantTopics, got)
+func TestBrokerInitialNumTopics(t *testing.T) {
+	t.Parallel()
+
+	broker := pubsub.NewBroker[string, string]()
+	want := 0
+
+	if got := broker.NumTopics(); want != got {
+		t.Errorf("want %d topics, got %d", want, got)
+	}
+}
+
+func TestBrokerInitialTopics(t *testing.T) {
+	t.Parallel()
+
+	broker := pubsub.NewBroker[string, string]()
+	topics := broker.Topics()
+	want := 0
+
+	if got := len(topics); want != got {
+		t.Errorf("want %d topics length, got %d", want, got)
 	}
 }
 
@@ -75,6 +94,53 @@ func TestBrokerSubscribeBufferedChannelCapacity(t *testing.T) {
 
 	if got := cap(sub); wantCap != got {
 		t.Errorf("want channel capacity %d, got %d", wantCap, got)
+	}
+}
+
+func TestBrokerTopics(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		subscribe []string // The topics to subscribe on.
+		want      []string // The expected topics to be returned.
+	}{
+		"no topics": {
+			subscribe: nil,
+			want:      nil,
+		},
+		"single topic": {
+			subscribe: []string{"a"},
+			want:      []string{"a"},
+		},
+		"multiple topics": {
+			subscribe: []string{"a", "b", "c"},
+			want:      []string{"a", "b", "c"},
+		},
+		"single topic multiple subscriptions": {
+			subscribe: []string{"a", "a", "a"},
+			want:      []string{"a"},
+		},
+		"multiple topics multiple subscriptions": {
+			subscribe: []string{"a", "b", "c", "a", "b", "c"},
+			want:      []string{"a", "b", "c"},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			broker := pubsub.NewBroker[string, string]()
+
+			// Loop to create multiple subscriptions.
+			for _, topic := range tc.subscribe {
+				broker.Subscribe(topic)
+			}
+
+			got := broker.Topics()
+
+			if !cmp.Equal(tc.want, got, sortStringSlices) {
+				t.Errorf("topics do not match (-want, +got):\n%s", cmp.Diff(tc.want, got, sortStringSlices))
+			}
+		})
 	}
 }
 

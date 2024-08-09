@@ -29,6 +29,21 @@ func NewBroker[T comparable, P any]() *Broker[T, P] {
 	}
 }
 
+// Topics returns a slice of all the topics registered on the Broker.
+//
+// A nil slice is returned if there are no topics.
+//
+// Note: The order of the topics is not guaranteed.
+func (b *Broker[T, P]) Topics() []T {
+	var topics []T
+	// The iteration order over maps is not guaranteed.
+	for topic := range b.topics {
+		topics = append(topics, topic)
+	}
+
+	return topics
+}
+
 // NumSubs returns the number of registered subscriptions.
 func (b *Broker[T, P]) NumSubs() int {
 	return len(b.subs)
