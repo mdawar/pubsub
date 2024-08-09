@@ -299,6 +299,39 @@ func TestBrokerPublishWithoutSubscriptions(t *testing.T) {
 	}
 }
 
+func TestBrokerPublishWithBufferedSubscription(t *testing.T) {
+	t.Parallel()
+
+	broker := pubsub.NewBroker[string, string]()
+	topic := "testing"
+	payload := "Test Message"
+	// Subscription with buffer size of 1.
+	sub := broker.SubscribeWithCapacity(1, topic)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		// Publish with a buffered subscription should not block.
+		broker.Publish(topic, payload)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Error("timed out waiting for Publish to return")
+	}
+
+	got := <-sub
+
+	if topic != got.Topic {
+		t.Errorf("want message topic %q, got %q", topic, got.Topic)
+	}
+
+	if payload != got.Payload {
+		t.Errorf("want message payload %q, got %q", payload, got.Payload)
+	}
+}
+
 // TODO: test NumTopics decreases after all subscriptions are removed.
 // TODO: test NumSubs does not decrease if not all subscriptions are removed.
 // TODO: test NumSubs decreases if all subscriptions are removed manually.
