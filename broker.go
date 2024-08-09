@@ -15,26 +15,33 @@ type Message[T any] struct {
 // of messages to specific topics or broadcasting to all subscribers.
 //
 // The Broker supports concurrent operations.
-type Broker[T any] struct{}
+type Broker[T any] struct {
+	// topics holds the topics and their subscriptions as a slice.
+	topics map[string][]chan Message[T]
+	// subs holds all of the subscription channels.
+	subs []chan Message[T]
+}
 
 // NewBroker creates a new message broker instance.
 func NewBroker[T any]() *Broker[T] {
-	return &Broker[T]{}
+	return &Broker[T]{
+		topics: make(map[string][]chan Message[T]),
+	}
 }
 
 // NumSubs returns the number of registered subscriptions.
 func (b *Broker[T]) NumSubs() int {
-	return 0
+	return len(b.subs)
 }
 
 // NumTopics returns the total number of topics registered on the broker.
 func (b *Broker[T]) NumTopics() int {
-	return 0
+	return len(b.topics)
 }
 
 // Subscribe creates a subscription for the specified topics.
 //
-// The subscription created is unbuffered.
+// The created subscription channel is unbuffered (capacity = 0).
 func (b *Broker[T]) Subscribe(topics ...string) <-chan Message[T] {
 	return b.SubscribeWithCapacity(0, topics...)
 }
@@ -44,6 +51,13 @@ func (b *Broker[T]) Subscribe(topics ...string) <-chan Message[T] {
 // The capacity specifies the subscription channel's buffer capacity.
 func (b *Broker[T]) SubscribeWithCapacity(capacity int, topics ...string) <-chan Message[T] {
 	sub := make(chan Message[T], capacity)
+
+	for _, topic := range topics {
+		b.topics[topic] = append(b.topics[topic], sub)
+	}
+
+	b.subs = append(b.subs, sub)
+
 	return sub
 }
 
