@@ -2,6 +2,7 @@ package pubsub_test
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -553,4 +554,139 @@ func TestBrokerTryPublishWithBufferedSubscription(t *testing.T) {
 	if payload != got.Payload {
 		t.Errorf("want message payload %q, got %q", payload, got.Payload)
 	}
+}
+
+func TestBrokerConcurrentPublishSubscribe(t *testing.T) {
+	t.Parallel()
+
+	broker := pubsub.NewBroker[string, string]()
+	// Topics to subscribe on.
+	topics := []string{"a", "b", "c"}
+	// Number of subscriptions to create per topic.
+	topicSubsCount := 10
+	// Total number of expected subscriptions.
+	totalSubsCount := topicSubsCount * len(topics)
+
+	var wg sync.WaitGroup
+
+	// Subscriber goroutines.
+	for range topicSubsCount {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			// Create a new subscription for each topic.
+			for _, topic := range topics {
+				wg.Add(1)
+				// Subscribe and wait for message in a new goroutine.
+				go func() {
+					defer wg.Done()
+					<-broker.Subscribe(topic)
+				}()
+			}
+		}()
+	}
+
+	// Wait for all of the subscriptions to be ready.
+	// This is required to make sure all of the subscriptions receive the messages.
+	RetryUntil(time.Second, func() bool {
+		var total int
+		for _, topic := range topics {
+			total += broker.Subs(topic)
+		}
+
+		return total == totalSubsCount
+	})
+
+	// Publisher goroutines.
+	for _, topic := range topics {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			// Blocks until all the subscribers receive the message.
+			broker.Publish(topic, "")
+		}()
+	}
+
+	wg.Wait()
+}
+
+func TestBrokerConcurrentTryPublishSubscribe(t *testing.T) {
+	t.Parallel()
+
+	broker := pubsub.NewBroker[string, string]()
+	// Topics to subscribe on.
+	topics := []string{"a", "b", "c"}
+
+	var wg sync.WaitGroup
+
+	// Subscriber goroutines.
+	for range 10 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			for _, topic := range topics {
+				wg.Add(1)
+				// Subscribe and wait for message in a new goroutine.
+				go func() {
+					defer wg.Done()
+					// Try to subscribe and receive without waiting.
+					select {
+					case <-broker.Subscribe(topic):
+					default:
+					}
+				}()
+			}
+		}()
+	}
+
+	// Publisher goroutines.
+	for _, topic := range topics {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			// Does not wait for the subscribers to be ready.
+			broker.TryPublish(topic, "")
+		}()
+	}
+
+	wg.Wait()
+}
+
+func TestBrokerConcurrentSubscribeUnsubscribe(t *testing.T) {
+	t.Parallel()
+
+	broker := pubsub.NewBroker[string, string]()
+	topic := "testing"
+	totalSubs := 10
+
+	var wg sync.WaitGroup
+
+	subs := make(chan (<-chan pubsub.Message[string, string]))
+
+	// Subscribe goroutines.
+	for range totalSubs {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			subs <- broker.Subscribe(topic)
+		}()
+	}
+
+	// Unsubscribe goroutines.
+	for range totalSubs {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			sub := <-subs
+			broker.Unsubscribe(sub)
+		}()
+	}
+
+	wg.Wait()
 }
