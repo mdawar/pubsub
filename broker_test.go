@@ -589,7 +589,7 @@ func TestBrokerConcurrentPublishSubscribe(t *testing.T) {
 
 	// Wait for all of the subscriptions to be ready.
 	// This is required to make sure all of the subscriptions receive the messages.
-	RetryUntil(time.Second, func() bool {
+	waitUntil(time.Second, func() bool {
 		var total int
 		for _, topic := range topics {
 			total += broker.Subs(topic)
