@@ -224,6 +224,45 @@ func TestBrokerNumTopicsWithSubscribersOnSameTopic(t *testing.T) {
 	assertTopics(0)
 }
 
+func TestBrokerSubs(t *testing.T) {
+	t.Parallel()
+
+	broker := pubsub.NewBroker[string, string]()
+
+	assertSubs := func(topic string, want int) {
+		t.Helper()
+		if got := broker.Subs(topic); want != got {
+			t.Fatalf("want %d subscriptions on topic %q, got %d", want, topic, got)
+		}
+	}
+
+	t1 := "a"
+	t2 := "b"
+
+	assertSubs(t1, 0)
+	assertSubs(t2, 0)
+
+	sub1 := broker.Subscribe(t1, t2)
+	assertSubs(t1, 1)
+	assertSubs(t2, 1)
+
+	sub2 := broker.Subscribe(t1, t2)
+	assertSubs(t1, 2)
+	assertSubs(t2, 2)
+
+	broker.Unsubscribe(sub1, t1)
+	assertSubs(t1, 1)
+
+	broker.Unsubscribe(sub2, t1)
+	assertSubs(t1, 0)
+
+	broker.Unsubscribe(sub1, t2)
+	assertSubs(t2, 1)
+
+	broker.Unsubscribe(sub2, t2)
+	assertSubs(t2, 0)
+}
+
 func TestBrokerPublish(t *testing.T) {
 	t.Parallel()
 

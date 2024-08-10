@@ -47,6 +47,11 @@ func (b *Broker[T, P]) NumTopics() int {
 	return len(b.subs)
 }
 
+// Subs returns the number of subscriptions on the specified topic.
+func (b *Broker[T, P]) Subs(topic T) int {
+	return len(b.subs[topic])
+}
+
 // Subscribe creates a subscription for the specified topics.
 //
 // The created subscription channel is unbuffered (capacity = 0).
