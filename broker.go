@@ -16,14 +16,14 @@ type Message[T any, P any] struct {
 //
 // The Broker supports concurrent operations.
 type Broker[T comparable, P any] struct {
-	// topics holds the topics and their subscriptions as a slice.
-	topics map[T][]chan Message[T, P]
+	// subs holds the topics and their subscriptions as a slice.
+	subs map[T][]chan Message[T, P]
 }
 
 // NewBroker creates a new message broker instance.
 func NewBroker[T comparable, P any]() *Broker[T, P] {
 	return &Broker[T, P]{
-		topics: make(map[T][]chan Message[T, P]),
+		subs: make(map[T][]chan Message[T, P]),
 	}
 }
 
@@ -35,7 +35,7 @@ func NewBroker[T comparable, P any]() *Broker[T, P] {
 func (b *Broker[T, P]) Topics() []T {
 	var topics []T
 	// The iteration order over maps is not guaranteed.
-	for topic := range b.topics {
+	for topic := range b.subs {
 		topics = append(topics, topic)
 	}
 
@@ -44,7 +44,7 @@ func (b *Broker[T, P]) Topics() []T {
 
 // NumTopics returns the total number of topics registered on the broker.
 func (b *Broker[T, P]) NumTopics() int {
-	return len(b.topics)
+	return len(b.subs)
 }
 
 // Subscribe creates a subscription for the specified topics.
@@ -61,7 +61,7 @@ func (b *Broker[T, P]) SubscribeWithCapacity(capacity int, topics ...T) <-chan M
 	sub := make(chan Message[T, P], capacity)
 
 	for _, topic := range topics {
-		b.topics[topic] = append(b.topics[topic], sub)
+		b.subs[topic] = append(b.subs[topic], sub)
 	}
 
 	return sub
@@ -82,7 +82,7 @@ func (b *Broker[T, P]) Unsubscribe(sub <-chan Message[T, P], topics ...T) {
 	}
 
 	// Unsubscribe from all topics.
-	for topic := range b.topics {
+	for topic := range b.subs {
 		b.removeSubscription(sub, topic)
 	}
 }
@@ -91,15 +91,15 @@ func (b *Broker[T, P]) Unsubscribe(sub <-chan Message[T, P], topics ...T) {
 //
 // The topic will be removed if there are no other subscriptions.
 func (b *Broker[T, P]) removeSubscription(sub <-chan Message[T, P], topic T) {
-	subscribers := b.topics[topic]
+	subscribers := b.subs[topic]
 	for i, s := range subscribers {
 		if s == sub {
 			// Remove the topic if this is the only subscription.
 			if len(subscribers) == 1 {
-				delete(b.topics, topic)
+				delete(b.subs, topic)
 			} else {
 				// Remove the subscription channel form the slice.
-				b.topics[topic] = append(subscribers[:i], subscribers[i+1:]...)
+				b.subs[topic] = append(subscribers[:i], subscribers[i+1:]...)
 			}
 		}
 	}
@@ -112,7 +112,7 @@ func (b *Broker[T, P]) removeSubscription(sub <-chan Message[T, P], topic T) {
 // This method will block if any of the subscription channels buffer is full.
 // This can be used to guarantee message delivery.
 func (b *Broker[T, P]) Publish(topic T, payload P) {
-	for _, sub := range b.topics[topic] {
+	for _, sub := range b.subs[topic] {
 		sub <- Message[T, P]{Topic: topic, Payload: payload}
 	}
 }
@@ -122,7 +122,7 @@ func (b *Broker[T, P]) Publish(topic T, payload P) {
 //
 // Note: Use the Publish method for guaranteed delivery.
 func (b *Broker[T, P]) TryPublish(topic T, payload P) {
-	for _, sub := range b.topics[topic] {
+	for _, sub := range b.subs[topic] {
 		select {
 		case sub <- Message[T, P]{Topic: topic, Payload: payload}:
 		default:
