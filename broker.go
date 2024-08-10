@@ -12,14 +12,12 @@ type Message[T any, P any] struct {
 //
 // The Broker is the core component of the pub/sub library.
 // It manages the registration of subscribers and handles the publishing
-// of messages to specific topics or broadcasting to all subscribers.
+// of messages to specific topics.
 //
 // The Broker supports concurrent operations.
 type Broker[T comparable, P any] struct {
 	// topics holds the topics and their subscriptions as a slice.
 	topics map[T][]chan Message[T, P]
-	// subs holds all of the subscription channels.
-	subs []chan Message[T, P]
 }
 
 // NewBroker creates a new message broker instance.
@@ -44,11 +42,6 @@ func (b *Broker[T, P]) Topics() []T {
 	return topics
 }
 
-// NumSubs returns the number of registered subscriptions.
-func (b *Broker[T, P]) NumSubs() int {
-	return len(b.subs)
-}
-
 // NumTopics returns the total number of topics registered on the broker.
 func (b *Broker[T, P]) NumTopics() int {
 	return len(b.topics)
@@ -70,8 +63,6 @@ func (b *Broker[T, P]) SubscribeWithCapacity(capacity int, topics ...T) <-chan M
 	for _, topic := range topics {
 		b.topics[topic] = append(b.topics[topic], sub)
 	}
-
-	b.subs = append(b.subs, sub)
 
 	return sub
 }
@@ -95,13 +86,6 @@ func (b *Broker[T, P]) Unsubscribe(sub <-chan Message[T, P], topics ...T) {
 			}
 		}
 	}
-
-	// TODO: only remove if subscriptions on all topics are removed.
-	for i, s := range b.subs {
-		if s == sub {
-			b.subs = append(b.subs[:i], b.subs[i+1:]...)
-		}
-	}
 }
 
 // Publish publishes a message on the topic with the specified payload.
@@ -121,10 +105,3 @@ func (b *Broker[T, P]) Publish(topic T, payload P) {
 // TryPublish publishes a message on the topic with the specified payload if the subscription's
 // channel buffer is not full.
 func (b *Broker[T, P]) TryPublish(topic T, payload P) {}
-
-// Broadcast publishes a message with the specified payload on all the subscriptions.
-func (b *Broker[T, P]) Broadcast(payload P) {}
-
-// TryBroadcast publishes a message with the specified payload on all the subscriptions if the
-// subscription's buffer is not full.
-func (b *Broker[T, P]) TryBroadcast(payload P) {}

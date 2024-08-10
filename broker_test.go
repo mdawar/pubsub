@@ -10,17 +10,6 @@ import (
 	"github.com/mdawar/pubsub"
 )
 
-func TestBrokerInitialNumSubs(t *testing.T) {
-	t.Parallel()
-
-	broker := pubsub.NewBroker[string, string]()
-	want := 0
-
-	if got := broker.NumSubs(); want != got {
-		t.Errorf("want %d subscriptions, got %d", want, got)
-	}
-}
-
 func TestBrokerInitialNumTopics(t *testing.T) {
 	t.Parallel()
 
@@ -235,60 +224,6 @@ func TestBrokerNumTopicsWithSubscribersOnSameTopic(t *testing.T) {
 	assertTopics(0)
 }
 
-func TestBrokerNumSubsAfterSubscriptions(t *testing.T) {
-	t.Parallel()
-
-	broker := pubsub.NewBroker[string, int]()
-	wantSubs := 10
-	wantFinalSubs := wantSubs * 2
-
-	for i := range wantSubs {
-		broker.Subscribe(fmt.Sprint(i))
-	}
-
-	if got := broker.NumSubs(); wantSubs != got {
-		t.Errorf("want %d subscriptions, got %d", wantSubs, got)
-	}
-
-	// Subscriptions on the same topics should create new subscriptions and increase the count.
-	for i := range wantSubs {
-		broker.Subscribe(fmt.Sprint(i))
-	}
-
-	if got := broker.NumSubs(); wantFinalSubs != got {
-		t.Errorf("want %d final subscriptions, got %d", wantFinalSubs, got)
-	}
-}
-
-func TestBrokerNumSubsDecreasesAfterUnsubscribe(t *testing.T) {
-	t.Parallel()
-
-	broker := pubsub.NewBroker[string, string]()
-
-	assertSubs := func(want int) {
-		t.Helper()
-		if got := broker.NumSubs(); want != got {
-			t.Fatalf("want subs count %d, got %d", want, got)
-		}
-	}
-
-	topic := "testing"
-
-	// First subscription.
-	sub1 := broker.Subscribe(topic)
-	assertSubs(1)
-
-	// Add 10 more subscriptions on the same topic.
-	for range 10 {
-		broker.Subscribe(topic)
-	}
-	assertSubs(11)
-
-	// Remove 1 subscription.
-	broker.Unsubscribe(sub1)
-	assertSubs(10)
-}
-
 func TestBrokerPublish(t *testing.T) {
 	t.Parallel()
 
@@ -418,6 +353,3 @@ func TestBrokerPublishAfterUnsubscribe(t *testing.T) {
 		t.Error("timed out waiting for Publish to return")
 	}
 }
-
-// TODO: test NumSubs does not decrease if not all subscriptions are removed.
-// TODO: test NumSubs decreases if all subscriptions are removed manually.
