@@ -353,6 +353,13 @@ func TestBrokerPublishAfterUnsubscribe(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Error("timed out waiting for Publish to return")
 	}
+
+	// Make sure the message is not delivered after unsubscribe.
+	select {
+	case <-sub:
+		t.Error("received unexpected message after unsubscribe")
+	default:
+	}
 }
 
 func TestBrokerPublishAfterUnsubscribeAllTopics(t *testing.T) {
