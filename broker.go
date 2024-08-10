@@ -70,19 +70,36 @@ func (b *Broker[T, P]) SubscribeWithCapacity(capacity int, topics ...T) <-chan M
 // Unsubscribe removes a subscription for the specified topics.
 //
 // All topic subscriptions are removed if none are specified.
+//
+// Note: Specifying the topics to unsubscribe from can be more efficient.
 func (b *Broker[T, P]) Unsubscribe(sub <-chan Message[T, P], topics ...T) {
-	for _, topic := range topics {
-		// Topic subscribers.
-		subscribers := b.topics[topic]
-		for i, s := range subscribers {
-			if s == sub {
-				// Remove the topic if this is the only subscription.
-				if len(subscribers) == 1 {
-					delete(b.topics, topic)
-				} else {
-					// Remove the subscription channel.
-					b.topics[topic] = append(subscribers[:i], subscribers[i+1:]...)
-				}
+	if len(topics) > 0 {
+		// Unsubscribe from the specified topics.
+		for _, topic := range topics {
+			b.removeSubscription(sub, topic)
+		}
+		return
+	}
+
+	// Unsubscribe from all topics.
+	for topic := range b.topics {
+		b.removeSubscription(sub, topic)
+	}
+}
+
+// removeSubscription removes a subscription channel from a topic.
+//
+// The topic will be removed if there are no other subscriptions.
+func (b *Broker[T, P]) removeSubscription(sub <-chan Message[T, P], topic T) {
+	subscribers := b.topics[topic]
+	for i, s := range subscribers {
+		if s == sub {
+			// Remove the topic if this is the only subscription.
+			if len(subscribers) == 1 {
+				delete(b.topics, topic)
+			} else {
+				// Remove the subscription channel form the slice.
+				b.topics[topic] = append(subscribers[:i], subscribers[i+1:]...)
 			}
 		}
 	}

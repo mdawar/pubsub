@@ -337,7 +337,34 @@ func TestBrokerPublishAfterUnsubscribe(t *testing.T) {
 	payload := "Test Message"
 
 	sub := broker.Subscribe(topic)
+	// Unsubscribe from the specified topic.
 	broker.Unsubscribe(sub, topic)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		// Should not block after unsubscribe.
+		broker.Publish(topic, payload)
+	}()
+
+	// Wait for Publish to return.
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Error("timed out waiting for Publish to return")
+	}
+}
+
+func TestBrokerPublishAfterUnsubscribeAllTopics(t *testing.T) {
+	t.Parallel()
+
+	broker := pubsub.NewBroker[string, string]()
+	topic := "testing"
+	payload := "Test Message"
+
+	sub := broker.Subscribe(topic)
+	// Unsubscribe from all topics.
+	broker.Unsubscribe(sub)
 
 	done := make(chan struct{})
 	go func() {
