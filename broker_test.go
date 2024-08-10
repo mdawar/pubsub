@@ -387,3 +387,131 @@ func TestBrokerPublishAfterUnsubscribeAllTopics(t *testing.T) {
 		t.Error("timed out waiting for Publish to return")
 	}
 }
+
+func TestBrokerTryPublishWithoutSubscriptions(t *testing.T) {
+	t.Parallel()
+
+	broker := pubsub.NewBroker[string, string]()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		broker.TryPublish("testing", "Message")
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Error("timed out waiting for TryPublish to return")
+	}
+}
+
+func TestBrokerTryPublishWithUnbufferedSubscription(t *testing.T) {
+	t.Parallel()
+
+	broker := pubsub.NewBroker[string, string]()
+
+	topic := "testing"
+	payload := "Message"
+	// Unbuffered subscription.
+	sub := broker.Subscribe(topic)
+
+	result := make(chan pubsub.Message[string, string])
+	ready := make(chan struct{})
+	go func() {
+		close(ready)
+		result <- <-sub
+	}()
+
+	// Wait until the subscription is ready to receive.
+	<-ready
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		broker.TryPublish(topic, payload)
+	}()
+
+	// Wait for TryPublish to return.
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for TryPublish to return")
+	}
+
+	// Check the received message.
+	select {
+	case got := <-result:
+		if topic != got.Topic {
+			t.Errorf("want message topic %q, got %q", topic, got.Topic)
+		}
+
+		if payload != got.Payload {
+			t.Errorf("want message payload %q, got %q", payload, got.Payload)
+		}
+	case <-time.After(time.Second):
+		t.Error("timed out waiting for message")
+	}
+}
+
+func TestBrokerTryPublishWithUnbufferedSubscriptionNotReady(t *testing.T) {
+	t.Parallel()
+
+	broker := pubsub.NewBroker[string, string]()
+
+	topic := "testing"
+	// Unbuffered subscription that we don't receive on.
+	sub := broker.Subscribe(topic)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		// Should not block if the subscription channel is not ready to receive.
+		broker.TryPublish(topic, "Message")
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for TryPublish to return")
+	}
+
+	// The message should not be delivered.
+	select {
+	case <-sub:
+		t.Error("received unexpected message")
+	default:
+	}
+}
+
+func TestBrokerTryPublishWithBufferedSubscription(t *testing.T) {
+	t.Parallel()
+
+	broker := pubsub.NewBroker[string, string]()
+	topic := "testing"
+	payload := "Test Message"
+	// Subscription with buffer size of 1.
+	sub := broker.SubscribeWithCapacity(1, topic)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		broker.TryPublish(topic, payload)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Error("timed out waiting for Publish to return")
+	}
+
+	got := <-sub
+
+	if topic != got.Topic {
+		t.Errorf("want message topic %q, got %q", topic, got.Topic)
+	}
+
+	if payload != got.Payload {
+		t.Errorf("want message payload %q, got %q", payload, got.Payload)
+	}
+}

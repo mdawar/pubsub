@@ -112,13 +112,20 @@ func (b *Broker[T, P]) removeSubscription(sub <-chan Message[T, P], topic T) {
 // This method will block if any of the subscription channels buffer is full.
 // This can be used to guarantee message delivery.
 func (b *Broker[T, P]) Publish(topic T, payload P) {
-	subs := b.topics[topic]
-
-	for _, sub := range subs {
+	for _, sub := range b.topics[topic] {
 		sub <- Message[T, P]{Topic: topic, Payload: payload}
 	}
 }
 
 // TryPublish publishes a message on the topic with the specified payload if the subscription's
 // channel buffer is not full.
-func (b *Broker[T, P]) TryPublish(topic T, payload P) {}
+//
+// Note: Use the Publish method for guaranteed delivery.
+func (b *Broker[T, P]) TryPublish(topic T, payload P) {
+	for _, sub := range b.topics[topic] {
+		select {
+		case sub <- Message[T, P]{Topic: topic, Payload: payload}:
+		default:
+		}
+	}
+}
