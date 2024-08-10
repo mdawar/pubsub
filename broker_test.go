@@ -292,15 +292,10 @@ func TestBrokerNumSubsDecreasesAfterUnsubscribe(t *testing.T) {
 func TestBrokerPublish(t *testing.T) {
 	t.Parallel()
 
-	cases := map[string]int{
-		"1 subscriber":    1,
-		"2 subscribers":   2,
-		"10 subscribers":  10,
-		"100 subscribers": 100,
-	}
+	cases := []int{1, 2, 10, 100}
 
-	for name, count := range cases {
-		t.Run(name, func(t *testing.T) {
+	for _, count := range cases {
+		t.Run(fmt.Sprint(count), func(t *testing.T) {
 			broker := pubsub.NewBroker[string, string]()
 			topic := "testing"
 			payload := "Test Message"
