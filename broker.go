@@ -1,6 +1,9 @@
 package pubsub
 
-import "sync"
+import (
+	"context"
+	"sync"
+)
 
 // Message represents a message delivered by the broker to a subscriber.
 type Message[T any, P any] struct {
@@ -133,13 +136,23 @@ func (b *Broker[T, P]) removeSubscription(sub <-chan Message[T, P], topic T) {
 //
 // This method will block if any of the subscription channels buffer is full.
 // This can be used to guarantee message delivery.
-func (b *Broker[T, P]) Publish(topic T, payload P) {
+//
+// Publishing will be canceled if the context is canceled or the deadline is exceeded.
+//
+// The returned error will be error returned by [context.Context.Err].
+func (b *Broker[T, P]) Publish(ctx context.Context, topic T, payload P) error {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
 	for _, sub := range b.subs[topic] {
-		sub <- Message[T, P]{Topic: topic, Payload: payload}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case sub <- Message[T, P]{Topic: topic, Payload: payload}:
+		}
 	}
+
+	return nil
 }
 
 // TryPublish publishes a message on the topic with the specified payload if the subscription's

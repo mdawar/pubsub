@@ -1,6 +1,8 @@
 package pubsub_test
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"testing"
@@ -284,11 +286,10 @@ func TestBrokerPublish(t *testing.T) {
 				subs = append(subs, sub)
 			}
 
-			done := make(chan struct{})
+			result := make(chan error)
 			go func() {
-				defer close(done)
 				// Blocks until all subscribers receive the message.
-				broker.Publish(topic, payload)
+				result <- broker.Publish(context.Background(), topic, payload)
 			}()
 
 			// Wait for messages to be received on the subscription channels.
@@ -309,7 +310,10 @@ func TestBrokerPublish(t *testing.T) {
 
 			// Wait for Publish to return.
 			select {
-			case <-done:
+			case err := <-result:
+				if err != nil {
+					t.Errorf("want nil error, got %q", err)
+				}
 			case <-time.After(time.Second):
 				t.Error("timed out waiting for Publish to return")
 			}
@@ -322,15 +326,69 @@ func TestBrokerPublishWithoutSubscriptions(t *testing.T) {
 
 	broker := pubsub.NewBroker[string, string]()
 
-	done := make(chan struct{})
+	result := make(chan error)
 	go func() {
-		defer close(done)
 		// A publish without any subscriptions should not block.
-		broker.Publish("testing", "Message")
+		result <- broker.Publish(context.Background(), "testing", "Message")
 	}()
 
 	select {
-	case <-done:
+	case err := <-result:
+		if err != nil {
+			t.Errorf("want nil error, got %q", err)
+		}
+	case <-time.After(time.Second):
+		t.Error("timed out waiting for Publish to return")
+	}
+}
+
+func TestBrokerPublishWithCanceledContext(t *testing.T) {
+	t.Parallel()
+
+	broker := pubsub.NewBroker[string, string]()
+	topic := "testing"
+
+	// A subscription that we don't receive on.
+	broker.Subscribe(topic)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	result := make(chan error)
+	go func() {
+		// Publish with a canceled context.
+		result <- broker.Publish(ctx, topic, "")
+	}()
+
+	select {
+	case err := <-result:
+		if !errors.Is(err, context.Canceled) {
+			t.Errorf(`want error %q, got "%v"`, context.Canceled, err)
+		}
+	case <-time.After(time.Second):
+		t.Error("timed out waiting for Publish to return")
+	}
+}
+
+func TestBrokerPublishWithCanceledContextAndWithoutSubscriptions(t *testing.T) {
+	t.Parallel()
+
+	broker := pubsub.NewBroker[string, string]()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	result := make(chan error)
+	go func() {
+		// A publish without any subscriptions should not block.
+		result <- broker.Publish(ctx, "testing", "Message")
+	}()
+
+	select {
+	case err := <-result:
+		if err != nil {
+			t.Errorf("want nil error, got %q", err)
+		}
 	case <-time.After(time.Second):
 		t.Error("timed out waiting for Publish to return")
 	}
@@ -345,15 +403,17 @@ func TestBrokerPublishWithBufferedSubscription(t *testing.T) {
 	// Subscription with buffer size of 1.
 	sub := broker.SubscribeWithCapacity(1, topic)
 
-	done := make(chan struct{})
+	result := make(chan error)
 	go func() {
-		defer close(done)
 		// Publish with a buffered subscription should not block.
-		broker.Publish(topic, payload)
+		result <- broker.Publish(context.Background(), topic, payload)
 	}()
 
 	select {
-	case <-done:
+	case err := <-result:
+		if err != nil {
+			t.Errorf("want nil error, got %q", err)
+		}
 	case <-time.After(time.Second):
 		t.Error("timed out waiting for Publish to return")
 	}
@@ -380,16 +440,18 @@ func TestBrokerPublishAfterUnsubscribe(t *testing.T) {
 	// Unsubscribe from the specified topic.
 	broker.Unsubscribe(sub, topic)
 
-	done := make(chan struct{})
+	result := make(chan error)
 	go func() {
-		defer close(done)
 		// Should not block after unsubscribe.
-		broker.Publish(topic, payload)
+		result <- broker.Publish(context.Background(), topic, payload)
 	}()
 
 	// Wait for Publish to return.
 	select {
-	case <-done:
+	case err := <-result:
+		if err != nil {
+			t.Errorf("want nil error, got %q", err)
+		}
 	case <-time.After(time.Second):
 		t.Error("timed out waiting for Publish to return")
 	}
@@ -413,16 +475,18 @@ func TestBrokerPublishAfterUnsubscribeAllTopics(t *testing.T) {
 	// Unsubscribe from all topics.
 	broker.Unsubscribe(sub)
 
-	done := make(chan struct{})
+	result := make(chan error)
 	go func() {
-		defer close(done)
 		// Should not block after unsubscribe.
-		broker.Publish(topic, payload)
+		result <- broker.Publish(context.Background(), topic, payload)
 	}()
 
 	// Wait for Publish to return.
 	select {
-	case <-done:
+	case err := <-result:
+		if err != nil {
+			t.Errorf("want nil error, got %q", err)
+		}
 	case <-time.After(time.Second):
 		t.Error("timed out waiting for Publish to return")
 	}
@@ -598,6 +662,9 @@ func TestBrokerConcurrentPublishSubscribe(t *testing.T) {
 		return total == totalSubsCount
 	})
 
+	// Publish return values.
+	results := make(chan error, len(topics))
+
 	// Publisher goroutines.
 	for _, topic := range topics {
 		wg.Add(1)
@@ -605,11 +672,22 @@ func TestBrokerConcurrentPublishSubscribe(t *testing.T) {
 			defer wg.Done()
 
 			// Blocks until all the subscribers receive the message.
-			broker.Publish(topic, "")
+			results <- broker.Publish(context.Background(), topic, "")
 		}()
 	}
 
 	wg.Wait()
+
+	for range len(topics) {
+		select {
+		case err := <-results:
+			if err != nil {
+				t.Errorf("want nil error, got %q", err)
+			}
+		case <-time.After(time.Second):
+			t.Error("timed out waiting to receive Publish return value")
+		}
+	}
 }
 
 func TestBrokerConcurrentTryPublishSubscribe(t *testing.T) {
