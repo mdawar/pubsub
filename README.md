@@ -1,6 +1,6 @@
 # pubsub
 
-[![Tests](https://github.com/mdawar/pubsub/actions/workflows/test.yml/badge.svg?branch=main&event=push)](https://github.com/mdawar/pubsub/actions)
+[![Tests](https://github.com/mdawar/pubsub/actions/workflows/test.yml/badge.svg)](https://github.com/mdawar/pubsub/actions/workflows/test.yml)
 
 `pubsub` is a simple and generic **topic-based** **publish/subscribe** library for in-process communication in **Go**.
 
