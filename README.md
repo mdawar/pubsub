@@ -54,8 +54,8 @@ broker.Unsubscribe(sub2)
 ```go
 // Publish a message with the specified message payload.
 // The payload can be of any type that is specified when creating the broker.
-// Note: This call will block if any of the subscription channels buffer is full.
-// The context can be used to cancel the operation.
+// This call will block until all the subscription channels receive the message.
+// The context can be used to cancel the operation or set a timeout.
 broker.Publish(context.TODO(), "events", "Sample message")
 ```
 
@@ -81,6 +81,8 @@ if err != nil {
 broker.TryPublish("events", "A message that may not be received")
 
 // Buffered subscriptions can be used for guaranteed delivery with a non-blocking publish.
+// Publish will still block if any subscription's channel buffer is full, or any of the
+// subscriptions is an unbuffered channel.
 bufferedSub := broker.SubscribeWithCapacity(1, "events")
 broker.Publish(context.TODO(), "events", "Guaranteed delivery message")
 ```

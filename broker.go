@@ -27,14 +27,14 @@ type Broker[T comparable, P any] struct {
 	subs map[T][]chan Message[T, P]
 }
 
-// NewBroker creates a new message broker instance.
+// NewBroker creates a new message [Broker] instance.
 func NewBroker[T comparable, P any]() *Broker[T, P] {
 	return &Broker[T, P]{
 		subs: make(map[T][]chan Message[T, P]),
 	}
 }
 
-// Topics returns a slice of all the topics registered on the Broker.
+// Topics returns a slice of all the topics registered on the [Broker].
 //
 // A nil slice is returned if there are no topics.
 //
@@ -52,7 +52,7 @@ func (b *Broker[T, P]) Topics() []T {
 	return topics
 }
 
-// NumTopics returns the total number of topics registered on the broker.
+// NumTopics returns the total number of topics registered on the [Broker].
 func (b *Broker[T, P]) NumTopics() int {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
@@ -130,9 +130,9 @@ func (b *Broker[T, P]) removeSubscription(sub <-chan Message[T, P], topic T) {
 	}
 }
 
-// Publish publishes a message on the topic with the specified payload.
+// Publish publishes a [Message] on the topic with the specified payload.
 //
-// The payload will be discarded if the there are no subscribers on the topic.
+// The message will be discarded if the there are no subscribers on the topic.
 //
 // This method will block if any of the subscription channels buffer is full.
 // This can be used to guarantee message delivery.
@@ -158,7 +158,7 @@ func (b *Broker[T, P]) Publish(ctx context.Context, topic T, payload P) error {
 // TryPublish publishes a message on the topic with the specified payload if the subscription's
 // channel buffer is not full.
 //
-// Note: Use the Publish method for guaranteed delivery.
+// Note: Use the [Broker.Publish] method for guaranteed delivery.
 func (b *Broker[T, P]) TryPublish(topic T, payload P) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
