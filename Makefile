@@ -1,2 +1,2 @@
 test:
-  go test -race -cover -count 1
+	go test -cover -race -count 1
