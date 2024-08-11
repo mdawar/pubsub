@@ -1,5 +1,7 @@
 # pubsub
 
+[![Tests](https://github.com/mdawar/pubsub/actions/workflows/test.yml/badge.svg?branch=main&event=push)](https://github.com/mdawar/pubsub/actions)
+
 `pubsub` is a simple and generic **topic-based** **publish/subscribe** library for in-process communication in **Go**.
 
 ## Installation
@@ -114,4 +116,14 @@ topicsCount := broker.NumTopics()
 
 // Get the subscribers count on a specific topic.
 count := broker.Subs("events")
+```
+
+## Tests
+
+```sh
+go test -race -cover
+# If you have "just" installed.
+just test
+# Or using make.
+make test
 ```
