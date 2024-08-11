@@ -215,7 +215,7 @@ func TestBrokerNumTopicsWithSubscribersOnSameTopic(t *testing.T) {
 
 	lastSubIndex := len(subs) - 1
 
-	// Remove all of the subscriptons and keep 1.
+	// Remove all of the subscriptions and keep 1.
 	for _, sub := range subs[:lastSubIndex] {
 		broker.Unsubscribe(sub, topic)
 		assertTopics(1)

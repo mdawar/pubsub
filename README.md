@@ -3,7 +3,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/mdawar/pubsub.svg)](https://pkg.go.dev/github.com/mdawar/pubsub)
 [![Tests](https://github.com/mdawar/pubsub/actions/workflows/test.yml/badge.svg)](https://github.com/mdawar/pubsub/actions/workflows/test.yml)
 
-`pubsub` is a simple and generic **topic-based** **publish/subscribe** library for in-process communication in **Go**.
+`pubsub` is a simple and generic **topic-based** **publish/subscribe** package for in-process communication in **Go**.
 
 ## Installation
 

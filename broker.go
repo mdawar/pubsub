@@ -1,3 +1,4 @@
+// Package pubsub provides a generic and concurrency-safe, topic-based publish/subscribe library for in-process communication.
 package pubsub
 
 import (
@@ -139,9 +140,8 @@ func (b *Broker[T, P]) removeSubscription(sub <-chan Message[T, P], topic T) {
 // This method will block if any of the subscription channels buffer is full.
 // This can be used to guarantee message delivery.
 //
-// Publishing will be canceled if the context is canceled or the deadline is exceeded.
-//
-// The returned error will be error returned by [context.Context.Err].
+// Publishing will be canceled if the context is canceled or the deadline is exceeded
+// and the value of [context.Context.Err] will be returned.
 func (b *Broker[T, P]) Publish(ctx context.Context, topic T, payload P) error {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
