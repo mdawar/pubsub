@@ -129,3 +129,13 @@ just test
 # Or using make.
 make test
 ```
+
+## Benchmarks
+
+```sh
+go test -bench .
+# Or Using "just".
+just benchmark
+# Or using make.
+make benchmark
+```
