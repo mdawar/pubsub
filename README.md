@@ -45,6 +45,7 @@ sub3 := broker.SubscribeWithCapacity(10, "events")
 broker.Unsubscribe(sub2, "actions", "testing")
 
 // Unsubscribe from all topics.
+// The channel will not be closed, it will only stop receiving messages.
 // Note: Specifying all the topics is much more efficient if performance is critical.
 broker.Unsubscribe(sub2)
 ```

@@ -93,6 +93,8 @@ func (b *Broker[T, P]) SubscribeWithCapacity(capacity int, topics ...T) <-chan M
 //
 // All topic subscriptions are removed if none are specified.
 //
+// The channel will not be closed, it will only stop receiving messages.
+//
 // Note: Specifying the topics to unsubscribe from can be more efficient.
 func (b *Broker[T, P]) Unsubscribe(sub <-chan Message[T, P], topics ...T) {
 	b.mu.Lock()
