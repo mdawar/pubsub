@@ -9,9 +9,14 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"go.uber.org/goleak"
 
 	"github.com/mdawar/pubsub"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 func TestBrokerInitialNumTopics(t *testing.T) {
 	t.Parallel()
