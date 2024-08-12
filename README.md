@@ -117,7 +117,7 @@ topics := broker.Topics()
 topicsCount := broker.NumTopics()
 
 // Get the subscribers count on a specific topic.
-count := broker.Subs("events")
+count := broker.Subscribers("events")
 ```
 
 ## Tests
