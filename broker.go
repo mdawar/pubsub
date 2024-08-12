@@ -133,32 +133,47 @@ func (b *Broker[T, P]) removeSubscription(sub <-chan Message[T, P], topic T) {
 	}
 }
 
-// Publish publishes a [Message] on the topic with the specified payload.
+// Publish publishes a [Message] to the topic with the specified payload.
 //
-// The message will be discarded if the there are no subscribers on the topic.
+// The message is sent concurrently to the subscribers, ensuring that a slow
+// consumer won't affect the other subscribers.
 //
-// This method will block if any of the subscription channels buffer is full.
-// This can be used to guarantee message delivery.
+// This method will block and wait for all the subscriptions to receive
+// the message or until the context is canceled.
 //
-// Publishing will be canceled if the context is canceled or the deadline is exceeded
-// and the value of [context.Context.Err] will be returned.
+// The value of [context.Context.Err] will be returned.
+//
+// A nil return value indicates that all the subscribers received the message.
+//
+// If there are no subscribers to the topic, the message will be discarded.
 func (b *Broker[T, P]) Publish(ctx context.Context, topic T, payload P) error {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
+	var wg sync.WaitGroup
+
 	for _, sub := range b.subs[topic] {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case sub <- Message[T, P]{Topic: topic, Payload: payload}:
-		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			select {
+			case <-ctx.Done():
+				return
+			case sub <- Message[T, P]{Topic: topic, Payload: payload}:
+			}
+		}()
 	}
 
+	wg.Wait()
 	return ctx.Err()
 }
 
-// TryPublish publishes a message on the topic with the specified payload if the subscription's
+// TryPublish publishes a message to the topic with the specified payload if the subscription's
 // channel buffer is not full.
+//
+// The message is sent sequentially to the subscribers that are ready to receive it and the others
+// are skipped.
 //
 // Note: Use the [Broker.Publish] method for guaranteed delivery.
 func (b *Broker[T, P]) TryPublish(topic T, payload P) {

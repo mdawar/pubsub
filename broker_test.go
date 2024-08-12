@@ -517,9 +517,11 @@ func TestBrokerPublishSlowSubscriber(t *testing.T) {
 		subs = append(subs, broker.Subscribe(topic))
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+
 	result := make(chan error)
 	go func() {
-		result <- broker.Publish(context.Background(), topic, payload)
+		result <- broker.Publish(ctx, topic, payload)
 	}()
 
 	// Wait for messages to be received on the subscription channels.
@@ -538,7 +540,8 @@ func TestBrokerPublishSlowSubscriber(t *testing.T) {
 		}
 	}
 
-	// TODO: cancel context for Publish to return.
+	// Cancel publishing.
+	cancel()
 
 	// Wait for Publish to return.
 	select {

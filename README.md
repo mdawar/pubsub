@@ -12,13 +12,17 @@
 go get -u github.com/mdawar/pubsub
 ```
 
+#### Import
+
+```go
+import "github.com/mdawar/pubsub"
+```
+
 ## Usage
 
 #### Create a Broker
 
 ```go
-import "github.com/mdawar/pubsub"
-
 // Create a broker and specify the topics type and the message payloads type.
 broker := pubsub.NewBroker[string, string]()
 
@@ -31,13 +35,13 @@ events := pubsub.NewBroker[string, Event]()
 A subscription is simply a channel, everything that you know about [channels](https://go.dev/ref/spec#Channel_types) can be applied to subscriptions.
 
 ```go
-// Create a subscription on a topic.
-// A subscription is a channel that receives messages published on the topic.
+// Create a subscription to a topic.
+// A subscription is a channel that receives messages published to the topic.
 // By default the channel is unbuffered (capacity = 0).
 sub1 := broker.Subscribe("events")
 
-// A subscription can be created on multiple topics.
-// The channel will receive all the messages published on all the specified topics.
+// A subscription can be created to multiple topics.
+// The channel will receive all the messages published to all the specified topics.
 sub2 := broker.Subscribe("events", "actions", "testing")
 
 // Create a subscription with a buffered channel.
@@ -57,10 +61,16 @@ broker.Unsubscribe(sub2)
 #### Publishing Messages
 
 ```go
-// Publish a message with the specified message payload.
+// Publish a message with the specified payload.
 // The payload can be of any type that is specified when creating the broker.
-// This call will block until all the subscription channels receive the message.
-// The context can be used to cancel the operation or set a timeout.
+//
+// The message will be sent concurrently to the subscribers, ensuring that a slow
+// consumer won't affect the other subscribers.
+//
+// This call will block until all the subscription channels receive the message
+// or until the context is canceled.
+//
+// A nil return value indicates that all the subscribers received the message.
 broker.Publish(context.TODO(), "events", "Sample message")
 ```
 
@@ -68,6 +78,8 @@ broker.Publish(context.TODO(), "events", "Sample message")
 // Publish a message and timeout after 1 second.
 ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 defer cancel()
+// In this case, Publish will deliver the message to subscribers that are
+// ready and will wait for the others for up to the timeout duration.
 err := broker.Publish(ctx, "events", "Sample message")
 // The error is not nil if the context was canceled or the deadline exceeded.
 if err != nil {
@@ -80,15 +92,19 @@ if err != nil {
 ```
 
 ```go
-// Non blocking publish.
-// The message will be received by subscriptions that are ready (channel buffer is not full).
+// Non blocking publish (Fire and forget).
+//
+// The message is sent sequentially to the subscribers that are ready to receive it
+// and the others are skipped.
+//
 // Note: Message delivery is not guaranteed.
-broker.TryPublish("events", "A message that may not be received")
+broker.TryPublish("events", "A message that may not be delivered")
 
 // Buffered subscriptions can be used for guaranteed delivery with a non-blocking publish.
+//
 // Publish will still block if any subscription's channel buffer is full, or any of the
 // subscriptions is an unbuffered channel.
-bufferedSub := broker.SubscribeWithCapacity(1, "events")
+sub := broker.SubscribeWithCapacity(1, "events")
 broker.Publish(context.TODO(), "events", "Guaranteed delivery message")
 ```
 
