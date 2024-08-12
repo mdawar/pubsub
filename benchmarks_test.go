@@ -49,13 +49,13 @@ func BenchmarkBrokerPublish(b *testing.B) {
 	started := make(chan struct{})
 	done := make(chan struct{})
 	go func() {
-		events := broker.Subscribe(topic)
+		msgs := broker.Subscribe(topic)
 		close(started)
 		for {
 			select {
 			case <-done:
 				return
-			case <-events:
+			case <-msgs:
 			}
 		}
 	}()
@@ -80,13 +80,13 @@ func BenchmarkBrokerTryPublish(b *testing.B) {
 	started := make(chan struct{})
 	done := make(chan struct{})
 	go func() {
-		events := broker.Subscribe(topic)
+		msgs := broker.Subscribe(topic)
 		close(started)
 		for {
 			select {
 			case <-done:
 				return
-			case <-events:
+			case <-msgs:
 			}
 		}
 	}()
