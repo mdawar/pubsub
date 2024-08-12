@@ -391,8 +391,8 @@ func TestBrokerPublishWithCanceledContextAndWithoutSubscriptions(t *testing.T) {
 
 	select {
 	case err := <-result:
-		if err != nil {
-			t.Errorf("want nil error, got %q", err)
+		if !errors.Is(err, context.Canceled) {
+			t.Errorf(`want error %q, got "%v"`, context.Canceled, err)
 		}
 	case <-time.After(time.Second):
 		t.Error("timed out waiting for Publish to return")

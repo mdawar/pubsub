@@ -154,7 +154,7 @@ func (b *Broker[T, P]) Publish(ctx context.Context, topic T, payload P) error {
 		}
 	}
 
-	return nil
+	return ctx.Err()
 }
 
 // TryPublish publishes a message on the topic with the specified payload if the subscription's
