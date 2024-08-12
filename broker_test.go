@@ -497,6 +497,60 @@ func TestBrokerPublishAfterUnsubscribeAllTopics(t *testing.T) {
 	}
 }
 
+func TestBrokerPublishSlowSubscriber(t *testing.T) {
+	t.Parallel()
+
+	broker := pubsub.NewBroker[string, string]()
+	topic := "testing"
+	payload := "message"
+
+	// Slow subscriber that will not be ready to receive the message.
+	// We will not receive on this channel to simulate a slow subscriber.
+	broker.Subscribe(topic)
+
+	// Subscriptions that will receive the message.
+	var subs []<-chan pubsub.Message[string, string]
+
+	// Create subscriptions that will receive the message after the slow subscriber.
+	// This way the channels will be stored after the slow subscriber internally.
+	for range 10 {
+		subs = append(subs, broker.Subscribe(topic))
+	}
+
+	result := make(chan error)
+	go func() {
+		result <- broker.Publish(context.Background(), topic, payload)
+	}()
+
+	// Wait for messages to be received on the subscription channels.
+	for _, sub := range subs {
+		select {
+		case got := <-sub:
+			if topic != got.Topic {
+				t.Errorf("want message topic %q, got %q", topic, got.Topic)
+			}
+
+			if payload != got.Payload {
+				t.Errorf("want message payload %q, got %q", payload, got.Payload)
+			}
+		case <-time.After(time.Second):
+			t.Fatal("timed out waiting for message")
+		}
+	}
+
+	// TODO: cancel context for Publish to return.
+
+	// Wait for Publish to return.
+	select {
+	case err := <-result:
+		if !errors.Is(err, context.Canceled) {
+			t.Errorf(`want error %q, got "%v"`, context.Canceled, err)
+		}
+	case <-time.After(time.Second):
+		t.Error("timed out waiting for Publish to return")
+	}
+}
+
 func TestBrokerTryPublishWithoutSubscriptions(t *testing.T) {
 	t.Parallel()
 
