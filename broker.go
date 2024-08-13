@@ -152,8 +152,8 @@ func (b *Broker[T, P]) Publish(ctx context.Context, topic T, payload P) error {
 
 	var wg sync.WaitGroup
 
+	wg.Add(len(b.subs[topic]))
 	for _, sub := range b.subs[topic] {
-		wg.Add(1)
 		go func() {
 			defer wg.Done()
 
