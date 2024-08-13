@@ -4,6 +4,7 @@ import (
 	"context"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/mdawar/pubsub"
 )
@@ -43,61 +44,89 @@ func BenchmarkBrokerUnsubscribe(b *testing.B) {
 }
 
 func BenchmarkBrokerPublish(b *testing.B) {
-	broker := pubsub.NewBroker[string, string]()
-	topic := "testing"
+	// Number of subscriptions to benchmark.
+	cases := []int{0, 1, 2, 4, 6, 8, 10}
 
-	started := make(chan struct{})
-	done := make(chan struct{})
-	go func() {
-		msgs := broker.Subscribe(topic)
-		close(started)
-		for {
-			select {
-			case <-done:
-				return
-			case <-msgs:
+	for _, count := range cases {
+		b.Run(strconv.Itoa(count), func(b *testing.B) {
+			broker := pubsub.NewBroker[string, string]()
+			topic := "testing"
+
+			done := make(chan struct{})
+
+			for range count {
+				go func() {
+					msgs := broker.Subscribe(topic)
+					for {
+						select {
+						case <-done:
+							return
+						case <-msgs:
+						}
+					}
+				}()
 			}
-		}
-	}()
 
-	<-started
+			ready := waitUntil(time.Second, func() bool {
+				return broker.Subscribers(topic) == count
+			})
 
-	ctx := context.Background()
+			if !ready {
+				b.Fatal("timed out waiting for subscriptions")
+			}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		broker.Publish(ctx, topic, strconv.Itoa(i))
+			ctx := context.Background()
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				broker.Publish(ctx, topic, strconv.Itoa(i))
+			}
+			b.StopTimer()
+
+			close(done)
+		})
 	}
-	b.StopTimer()
-
-	close(done)
 }
 
 func BenchmarkBrokerTryPublish(b *testing.B) {
-	broker := pubsub.NewBroker[string, string]()
-	topic := "testing"
+	// Number of subscriptions to benchmark.
+	cases := []int{0, 1, 2, 4, 6, 8, 10}
 
-	started := make(chan struct{})
-	done := make(chan struct{})
-	go func() {
-		msgs := broker.Subscribe(topic)
-		close(started)
-		for {
-			select {
-			case <-done:
-				return
-			case <-msgs:
+	for _, count := range cases {
+		b.Run(strconv.Itoa(count), func(b *testing.B) {
+			broker := pubsub.NewBroker[string, string]()
+			topic := "testing"
+
+			done := make(chan struct{})
+
+			for range count {
+				go func() {
+					msgs := broker.Subscribe(topic)
+					for {
+						select {
+						case <-done:
+							return
+						case <-msgs:
+						}
+					}
+				}()
 			}
-		}
-	}()
 
-	<-started
+			ready := waitUntil(time.Second, func() bool {
+				return broker.Subscribers(topic) == count
+			})
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		broker.TryPublish(topic, strconv.Itoa(i))
+			if !ready {
+				b.Fatal("timed out waiting for subscriptions")
+			}
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				broker.TryPublish(topic, strconv.Itoa(i))
+			}
+			b.StopTimer()
+
+			close(done)
+		})
 	}
-	b.StopTimer()
-
-	close(done)
 }
