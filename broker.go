@@ -150,22 +150,36 @@ func (b *Broker[T, P]) Publish(ctx context.Context, topic T, payload P) error {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
-	var wg sync.WaitGroup
+	subs := b.subs[topic]
+	msg := Message[T, P]{Topic: topic, Payload: payload}
 
-	wg.Add(len(b.subs[topic]))
-	for _, sub := range b.subs[topic] {
-		go func() {
-			defer wg.Done()
+	switch len(subs) {
+	case 0:
+		// Do nothing.
+	case 1:
+		select {
+		case <-ctx.Done():
+		case subs[0] <- msg:
+		}
+	default:
+		var wg sync.WaitGroup
 
-			select {
-			case <-ctx.Done():
-				return
-			case sub <- Message[T, P]{Topic: topic, Payload: payload}:
-			}
-		}()
+		wg.Add(len(subs))
+		for _, sub := range subs {
+			go func() {
+				defer wg.Done()
+
+				select {
+				case <-ctx.Done():
+					return
+				case sub <- msg:
+				}
+			}()
+		}
+
+		wg.Wait()
 	}
 
-	wg.Wait()
 	return ctx.Err()
 }
 
