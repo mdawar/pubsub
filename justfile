@@ -7,4 +7,4 @@ test *args:
 
 # Run benchmarks
 benchmark *args:
-  go test -bench . {{args}}
+  go test -bench . -benchmem {{args}}
