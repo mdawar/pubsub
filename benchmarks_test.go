@@ -29,7 +29,7 @@ func BenchmarkBrokerSubscribeWithCapacity(b *testing.B) {
 func BenchmarkBrokerUnsubscribe(b *testing.B) {
 	broker := pubsub.NewBroker[string, string]()
 
-	subs := make([]<-chan pubsub.Message[string, string], b.N)
+	subs := make([]<-chan pubsub.Message[string, string], 0, b.N)
 
 	for i := 0; i < b.N; i++ {
 		sub := broker.Subscribe(strconv.Itoa(i))
