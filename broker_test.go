@@ -14,6 +14,9 @@ import (
 	"github.com/mdawar/pubsub"
 )
 
+// Message is an alias for [pubsub.Message] with a string type for fields.
+type Message = pubsub.Message[string, string, string]
+
 func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m)
 }
@@ -21,7 +24,7 @@ func TestMain(m *testing.M) {
 func TestBrokerInitialNumTopics(t *testing.T) {
 	t.Parallel()
 
-	broker := pubsub.NewBroker[string, string]()
+	broker := pubsub.NewBroker[string, string, string]()
 	want := 0
 
 	if got := broker.NumTopics(); want != got {
@@ -32,7 +35,7 @@ func TestBrokerInitialNumTopics(t *testing.T) {
 func TestBrokerInitialTopics(t *testing.T) {
 	t.Parallel()
 
-	broker := pubsub.NewBroker[string, string]()
+	broker := pubsub.NewBroker[string, string, string]()
 	topics := broker.Topics()
 	want := 0
 
@@ -44,7 +47,7 @@ func TestBrokerInitialTopics(t *testing.T) {
 func TestBrokerSubscribeOnSameTopicReturnsNewChannel(t *testing.T) {
 	t.Parallel()
 
-	broker := pubsub.NewBroker[string, int]()
+	broker := pubsub.NewBroker[string, int, string]()
 
 	topic := "testing"
 	sub1 := broker.Subscribe(topic)
@@ -58,7 +61,7 @@ func TestBrokerSubscribeOnSameTopicReturnsNewChannel(t *testing.T) {
 func TestBrokerSubscribeWithCapacityOnSameTopicReturnsNewChannel(t *testing.T) {
 	t.Parallel()
 
-	broker := pubsub.NewBroker[string, int]()
+	broker := pubsub.NewBroker[string, int, string]()
 
 	topic := "testing"
 	sub1 := broker.SubscribeWithCapacity(1, topic)
@@ -72,7 +75,7 @@ func TestBrokerSubscribeWithCapacityOnSameTopicReturnsNewChannel(t *testing.T) {
 func TestBrokerSubscribeUnbufferedChannelCapacity(t *testing.T) {
 	t.Parallel()
 
-	broker := pubsub.NewBroker[string, int]()
+	broker := pubsub.NewBroker[string, int, string]()
 
 	sub := broker.Subscribe("testing")
 	wantCap := 0
@@ -85,7 +88,7 @@ func TestBrokerSubscribeUnbufferedChannelCapacity(t *testing.T) {
 func TestBrokerSubscribeBufferedChannelCapacity(t *testing.T) {
 	t.Parallel()
 
-	broker := pubsub.NewBroker[string, int]()
+	broker := pubsub.NewBroker[string, int, string]()
 
 	wantCap := 10
 	sub := broker.SubscribeWithCapacity(wantCap, "testing")
@@ -126,7 +129,7 @@ func TestBrokerTopics(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			broker := pubsub.NewBroker[string, string]()
+			broker := pubsub.NewBroker[string, string, string]()
 
 			// Loop to create multiple subscriptions.
 			for _, topic := range tc.subscribe {
@@ -145,7 +148,7 @@ func TestBrokerTopics(t *testing.T) {
 func TestBrokerNumTopicsAfterSubscriptions(t *testing.T) {
 	t.Parallel()
 
-	broker := pubsub.NewBroker[string, int]()
+	broker := pubsub.NewBroker[string, int, string]()
 	wantTopics := 10
 
 	for i := range wantTopics {
@@ -169,7 +172,7 @@ func TestBrokerNumTopicsAfterSubscriptions(t *testing.T) {
 func TestBrokerNumTopicsDecreasesAfterUnsubscribe(t *testing.T) {
 	t.Parallel()
 
-	broker := pubsub.NewBroker[string, int]()
+	broker := pubsub.NewBroker[string, int, string]()
 
 	assertTopics := func(want int) {
 		t.Helper()
@@ -196,7 +199,7 @@ func TestBrokerNumTopicsDecreasesAfterUnsubscribe(t *testing.T) {
 func TestBrokerNumTopicsWithSubscribersOnSameTopic(t *testing.T) {
 	t.Parallel()
 
-	broker := pubsub.NewBroker[string, string]()
+	broker := pubsub.NewBroker[string, string, string]()
 
 	assertTopics := func(want int) {
 		t.Helper()
@@ -207,7 +210,7 @@ func TestBrokerNumTopicsWithSubscribersOnSameTopic(t *testing.T) {
 
 	assertTopics(0)
 
-	var subs []<-chan pubsub.Message[string, string]
+	var subs []<-chan pubsub.Message[string, string, string]
 	topic := "testing"
 	count := 10
 
@@ -235,7 +238,7 @@ func TestBrokerNumTopicsWithSubscribersOnSameTopic(t *testing.T) {
 func TestBrokerSubscribers(t *testing.T) {
 	t.Parallel()
 
-	broker := pubsub.NewBroker[string, string]()
+	broker := pubsub.NewBroker[string, string, string]()
 
 	assertSubs := func(topic string, want int) {
 		t.Helper()
@@ -271,6 +274,23 @@ func TestBrokerSubscribers(t *testing.T) {
 	assertSubs(t2, 0)
 }
 
+// assertEqual asserts that the messages want and got are equal.
+func assertEqual(t testing.TB, want, got Message) {
+	t.Helper()
+
+	if want.Topic != got.Topic {
+		t.Errorf("want message topic %q, got %q", want.Topic, got.Topic)
+	}
+
+	if want.Payload != got.Payload {
+		t.Errorf("want message payload %q, got %q", want.Payload, got.Payload)
+	}
+
+	if want.Sender != got.Sender {
+		t.Errorf("want message sender %q, got %q", want.Sender, got.Sender)
+	}
+}
+
 func TestBrokerPublish(t *testing.T) {
 	t.Parallel()
 
@@ -278,36 +298,33 @@ func TestBrokerPublish(t *testing.T) {
 
 	for _, count := range cases {
 		t.Run(fmt.Sprint(count), func(t *testing.T) {
-			broker := pubsub.NewBroker[string, string]()
-			topic := "testing"
-			payload := "Test Message"
+			broker := pubsub.NewBroker[string, string, string]()
+			want := Message{
+				Topic:   "testing",
+				Payload: "Test Message",
+				Sender:  "test-sender",
+			}
 
 			// Subscriptions.
-			var subs []<-chan pubsub.Message[string, string]
+			var subs []<-chan pubsub.Message[string, string, string]
 
 			// Create the subscriptions.
 			for range count {
-				sub := broker.Subscribe(topic)
+				sub := broker.Subscribe(want.Topic)
 				subs = append(subs, sub)
 			}
 
 			result := make(chan error)
 			go func() {
 				// Blocks until all subscribers receive the message.
-				result <- broker.Publish(context.Background(), topic, payload)
+				result <- broker.Publish(context.Background(), want)
 			}()
 
 			// Wait for messages to be received on the subscription channels.
 			for _, sub := range subs {
 				select {
 				case got := <-sub:
-					if topic != got.Topic {
-						t.Errorf("want message topic %q, got %q", topic, got.Topic)
-					}
-
-					if payload != got.Payload {
-						t.Errorf("want message payload %q, got %q", payload, got.Payload)
-					}
+					assertEqual(t, want, got)
 				case <-time.After(time.Second):
 					t.Error("timed out waiting for message")
 				}
@@ -329,28 +346,42 @@ func TestBrokerPublish(t *testing.T) {
 func TestBrokerPublishWithoutSubscriptions(t *testing.T) {
 	t.Parallel()
 
-	broker := pubsub.NewBroker[string, string]()
+	cases := map[string]Message{
+		"with topic": {
+			Topic:   "testing",
+			Payload: "Message",
+		},
+		"without topic": {
+			Payload: "Message without a topic",
+		},
+	}
 
-	result := make(chan error)
-	go func() {
-		// A publish without any subscriptions should not block.
-		result <- broker.Publish(context.Background(), "testing", "Message")
-	}()
+	for name, msg := range cases {
+		t.Run(name, func(t *testing.T) {
+			broker := pubsub.NewBroker[string, string, string]()
 
-	select {
-	case err := <-result:
-		if err != nil {
-			t.Errorf("want nil error, got %q", err)
-		}
-	case <-time.After(time.Second):
-		t.Error("timed out waiting for Publish to return")
+			result := make(chan error)
+			go func() {
+				// A publish without any subscriptions should not block.
+				result <- broker.Publish(context.Background(), msg)
+			}()
+
+			select {
+			case err := <-result:
+				if err != nil {
+					t.Errorf("want nil error, got %q", err)
+				}
+			case <-time.After(time.Second):
+				t.Error("timed out waiting for Publish to return")
+			}
+		})
 	}
 }
 
 func TestBrokerPublishWithCanceledContext(t *testing.T) {
 	t.Parallel()
 
-	broker := pubsub.NewBroker[string, string]()
+	broker := pubsub.NewBroker[string, string, string]()
 	topic := "testing"
 
 	// A subscription that we don't receive on.
@@ -362,7 +393,7 @@ func TestBrokerPublishWithCanceledContext(t *testing.T) {
 	result := make(chan error)
 	go func() {
 		// Publish with a canceled context.
-		result <- broker.Publish(ctx, topic, "")
+		result <- broker.Publish(ctx, Message{Topic: topic, Payload: "Test"})
 	}()
 
 	select {
@@ -378,7 +409,7 @@ func TestBrokerPublishWithCanceledContext(t *testing.T) {
 func TestBrokerPublishWithCanceledContextAndWithoutSubscriptions(t *testing.T) {
 	t.Parallel()
 
-	broker := pubsub.NewBroker[string, string]()
+	broker := pubsub.NewBroker[string, string, string]()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -386,7 +417,7 @@ func TestBrokerPublishWithCanceledContextAndWithoutSubscriptions(t *testing.T) {
 	result := make(chan error)
 	go func() {
 		// A publish without any subscriptions should not block.
-		result <- broker.Publish(ctx, "testing", "Message")
+		result <- broker.Publish(ctx, Message{Topic: "testing", Payload: "Message"})
 	}()
 
 	select {
@@ -402,16 +433,20 @@ func TestBrokerPublishWithCanceledContextAndWithoutSubscriptions(t *testing.T) {
 func TestBrokerPublishWithBufferedSubscription(t *testing.T) {
 	t.Parallel()
 
-	broker := pubsub.NewBroker[string, string]()
-	topic := "testing"
-	payload := "Test Message"
+	broker := pubsub.NewBroker[string, string, string]()
+	want := Message{
+		Topic:   "testing",
+		Payload: "Test Message",
+		Sender:  "test-sender",
+	}
+
 	// Subscription with buffer size of 1.
-	sub := broker.SubscribeWithCapacity(1, topic)
+	sub := broker.SubscribeWithCapacity(1, want.Topic)
 
 	result := make(chan error)
 	go func() {
 		// Publish with a buffered subscription should not block.
-		result <- broker.Publish(context.Background(), topic, payload)
+		result <- broker.Publish(context.Background(), want)
 	}()
 
 	select {
@@ -424,31 +459,26 @@ func TestBrokerPublishWithBufferedSubscription(t *testing.T) {
 	}
 
 	got := <-sub
-
-	if topic != got.Topic {
-		t.Errorf("want message topic %q, got %q", topic, got.Topic)
-	}
-
-	if payload != got.Payload {
-		t.Errorf("want message payload %q, got %q", payload, got.Payload)
-	}
+	assertEqual(t, want, got)
 }
 
 func TestBrokerPublishAfterUnsubscribe(t *testing.T) {
 	t.Parallel()
 
-	broker := pubsub.NewBroker[string, string]()
-	topic := "testing"
-	payload := "Test Message"
+	broker := pubsub.NewBroker[string, string, string]()
+	msg := Message{
+		Topic:   "testing",
+		Payload: "Test Message",
+	}
 
-	sub := broker.Subscribe(topic)
+	sub := broker.Subscribe(msg.Topic)
 	// Unsubscribe from the specified topic.
-	broker.Unsubscribe(sub, topic)
+	broker.Unsubscribe(sub, msg.Topic)
 
 	result := make(chan error)
 	go func() {
 		// Should not block after unsubscribe.
-		result <- broker.Publish(context.Background(), topic, payload)
+		result <- broker.Publish(context.Background(), msg)
 	}()
 
 	// Wait for Publish to return.
@@ -472,18 +502,20 @@ func TestBrokerPublishAfterUnsubscribe(t *testing.T) {
 func TestBrokerPublishAfterUnsubscribeAllTopics(t *testing.T) {
 	t.Parallel()
 
-	broker := pubsub.NewBroker[string, string]()
-	topic := "testing"
-	payload := "Test Message"
+	broker := pubsub.NewBroker[string, string, string]()
+	msg := Message{
+		Topic:   "testing",
+		Payload: "Test Message",
+	}
 
-	sub := broker.Subscribe(topic)
+	sub := broker.Subscribe(msg.Topic)
 	// Unsubscribe from all topics.
 	broker.Unsubscribe(sub)
 
 	result := make(chan error)
 	go func() {
 		// Should not block after unsubscribe.
-		result <- broker.Publish(context.Background(), topic, payload)
+		result <- broker.Publish(context.Background(), msg)
 	}()
 
 	// Wait for Publish to return.
@@ -500,41 +532,38 @@ func TestBrokerPublishAfterUnsubscribeAllTopics(t *testing.T) {
 func TestBrokerPublishSlowSubscriber(t *testing.T) {
 	t.Parallel()
 
-	broker := pubsub.NewBroker[string, string]()
-	topic := "testing"
-	payload := "message"
+	broker := pubsub.NewBroker[string, string, string]()
+	want := Message{
+		Topic:   "testing",
+		Payload: "Test Message",
+		Sender:  "test-sender",
+	}
 
 	// Slow subscriber that will not be ready to receive the message.
 	// We will not receive on this channel to simulate a slow subscriber.
-	broker.Subscribe(topic)
+	broker.Subscribe(want.Topic)
 
 	// Subscriptions that will receive the message.
-	var subs []<-chan pubsub.Message[string, string]
+	var subs []<-chan pubsub.Message[string, string, string]
 
 	// Create subscriptions that will receive the message after the slow subscriber.
 	// This way the channels will be stored after the slow subscriber internally.
 	for range 10 {
-		subs = append(subs, broker.Subscribe(topic))
+		subs = append(subs, broker.Subscribe(want.Topic))
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 
 	result := make(chan error)
 	go func() {
-		result <- broker.Publish(ctx, topic, payload)
+		result <- broker.Publish(ctx, want)
 	}()
 
 	// Wait for messages to be received on the subscription channels.
 	for _, sub := range subs {
 		select {
 		case got := <-sub:
-			if topic != got.Topic {
-				t.Errorf("want message topic %q, got %q", topic, got.Topic)
-			}
-
-			if payload != got.Payload {
-				t.Errorf("want message payload %q, got %q", payload, got.Payload)
-			}
+			assertEqual(t, want, got)
 		case <-time.After(time.Second):
 			t.Fatal("timed out waiting for message")
 		}
@@ -557,12 +586,12 @@ func TestBrokerPublishSlowSubscriber(t *testing.T) {
 func TestBrokerTryPublishWithoutSubscriptions(t *testing.T) {
 	t.Parallel()
 
-	broker := pubsub.NewBroker[string, string]()
+	broker := pubsub.NewBroker[string, string, string]()
 
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		broker.TryPublish("testing", "Message")
+		broker.TryPublish(Message{Topic: "testing", Payload: "Message"})
 	}()
 
 	select {
@@ -575,14 +604,18 @@ func TestBrokerTryPublishWithoutSubscriptions(t *testing.T) {
 func TestBrokerTryPublishWithUnbufferedSubscription(t *testing.T) {
 	t.Parallel()
 
-	broker := pubsub.NewBroker[string, string]()
+	broker := pubsub.NewBroker[string, string, string]()
 
-	topic := "testing"
-	payload := "Message"
+	want := Message{
+		Topic:   "testing",
+		Payload: "Test Message",
+		Sender:  "test-sender",
+	}
+
 	// Unbuffered subscription.
-	sub := broker.Subscribe(topic)
+	sub := broker.Subscribe(want.Topic)
 
-	result := make(chan pubsub.Message[string, string])
+	result := make(chan pubsub.Message[string, string, string])
 	ready := make(chan struct{})
 	go func() {
 		close(ready)
@@ -595,7 +628,7 @@ func TestBrokerTryPublishWithUnbufferedSubscription(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		broker.TryPublish(topic, payload)
+		broker.TryPublish(want)
 	}()
 
 	// Wait for TryPublish to return.
@@ -608,13 +641,7 @@ func TestBrokerTryPublishWithUnbufferedSubscription(t *testing.T) {
 	// Check the received message.
 	select {
 	case got := <-result:
-		if topic != got.Topic {
-			t.Errorf("want message topic %q, got %q", topic, got.Topic)
-		}
-
-		if payload != got.Payload {
-			t.Errorf("want message payload %q, got %q", payload, got.Payload)
-		}
+		assertEqual(t, want, got)
 	case <-time.After(time.Second):
 		t.Error("timed out waiting for message")
 	}
@@ -623,7 +650,7 @@ func TestBrokerTryPublishWithUnbufferedSubscription(t *testing.T) {
 func TestBrokerTryPublishWithUnbufferedSubscriptionNotReady(t *testing.T) {
 	t.Parallel()
 
-	broker := pubsub.NewBroker[string, string]()
+	broker := pubsub.NewBroker[string, string, string]()
 
 	topic := "testing"
 	// Unbuffered subscription that we don't receive on.
@@ -633,7 +660,7 @@ func TestBrokerTryPublishWithUnbufferedSubscriptionNotReady(t *testing.T) {
 	go func() {
 		defer close(done)
 		// Should not block if the subscription channel is not ready to receive.
-		broker.TryPublish(topic, "Message")
+		broker.TryPublish(Message{Topic: topic, Payload: "Message"})
 	}()
 
 	select {
@@ -653,16 +680,20 @@ func TestBrokerTryPublishWithUnbufferedSubscriptionNotReady(t *testing.T) {
 func TestBrokerTryPublishWithBufferedSubscription(t *testing.T) {
 	t.Parallel()
 
-	broker := pubsub.NewBroker[string, string]()
-	topic := "testing"
-	payload := "Test Message"
+	broker := pubsub.NewBroker[string, string, string]()
+	want := Message{
+		Topic:   "testing",
+		Payload: "Test Message",
+		Sender:  "test-sender",
+	}
+
 	// Subscription with buffer size of 1.
-	sub := broker.SubscribeWithCapacity(1, topic)
+	sub := broker.SubscribeWithCapacity(1, want.Topic)
 
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		broker.TryPublish(topic, payload)
+		broker.TryPublish(want)
 	}()
 
 	select {
@@ -672,20 +703,13 @@ func TestBrokerTryPublishWithBufferedSubscription(t *testing.T) {
 	}
 
 	got := <-sub
-
-	if topic != got.Topic {
-		t.Errorf("want message topic %q, got %q", topic, got.Topic)
-	}
-
-	if payload != got.Payload {
-		t.Errorf("want message payload %q, got %q", payload, got.Payload)
-	}
+	assertEqual(t, want, got)
 }
 
 func TestBrokerConcurrentPublishSubscribe(t *testing.T) {
 	t.Parallel()
 
-	broker := pubsub.NewBroker[string, string]()
+	broker := pubsub.NewBroker[string, string, string]()
 	// Topics to subscribe on.
 	topics := []string{"a", "b", "c"}
 	// Number of subscriptions to create per topic.
@@ -734,7 +758,7 @@ func TestBrokerConcurrentPublishSubscribe(t *testing.T) {
 			defer wg.Done()
 
 			// Blocks until all the subscribers receive the message.
-			results <- broker.Publish(context.Background(), topic, "")
+			results <- broker.Publish(context.Background(), Message{Topic: topic})
 		}()
 	}
 
@@ -755,7 +779,7 @@ func TestBrokerConcurrentPublishSubscribe(t *testing.T) {
 func TestBrokerConcurrentTryPublishSubscribe(t *testing.T) {
 	t.Parallel()
 
-	broker := pubsub.NewBroker[string, string]()
+	broker := pubsub.NewBroker[string, string, string]()
 	// Topics to subscribe on.
 	topics := []string{"a", "b", "c"}
 
@@ -789,7 +813,7 @@ func TestBrokerConcurrentTryPublishSubscribe(t *testing.T) {
 			defer wg.Done()
 
 			// Does not wait for the subscribers to be ready.
-			broker.TryPublish(topic, "")
+			broker.TryPublish(Message{Topic: topic})
 		}()
 	}
 
@@ -799,13 +823,13 @@ func TestBrokerConcurrentTryPublishSubscribe(t *testing.T) {
 func TestBrokerConcurrentSubscribeUnsubscribe(t *testing.T) {
 	t.Parallel()
 
-	broker := pubsub.NewBroker[string, string]()
+	broker := pubsub.NewBroker[string, string, string]()
 	topic := "testing"
 	totalSubs := 10
 
 	var wg sync.WaitGroup
 
-	subs := make(chan (<-chan pubsub.Message[string, string]))
+	subs := make(chan (<-chan pubsub.Message[string, string, string]))
 
 	// Subscribe goroutines.
 	for range totalSubs {

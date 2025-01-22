@@ -12,7 +12,7 @@ import (
 
 func Example() {
 	// A broker with topic and message payload of type string.
-	broker := pubsub.NewBroker[string, string]()
+	broker := pubsub.NewBroker[string, string, string]()
 
 	// Topic to publish the message to.
 	topic := "example"
@@ -34,6 +34,7 @@ func Example() {
 			// Message fields.
 			_ = msg.Topic
 			_ = msg.Payload
+			_ = msg.Sender
 		}()
 	}
 
@@ -49,7 +50,7 @@ func Example() {
 	// Publish a message concurrently to the topic.
 	// This call will wait for all subscribers to receive the message or
 	// until the context is canceled (e.g. on timeout).
-	err := broker.Publish(ctx, topic, "Message to deliver")
+	err := broker.Publish(ctx, Message{Topic: topic, Payload: "Message to deliver"})
 	if err != nil {
 		// In this case 1 or more subscribers did not receive the message.
 		switch {
@@ -67,16 +68,15 @@ func Example() {
 }
 
 func ExampleBroker() {
-	// A broker with topic and message payload of type string.
-	// The payload can of any type.
-	pubsub.NewBroker[string, string]()
+	// A broker with topic, message payload and sender of type string.
+	pubsub.NewBroker[string, string, string]()
 
-	// A broker with integer topics.
-	pubsub.NewBroker[int, string]()
+	// A broker with integer topics and a uint sender.
+	pubsub.NewBroker[int, string, uint]()
 }
 
 func ExampleBroker_Subscribe() {
-	broker := pubsub.NewBroker[string, string]()
+	broker := pubsub.NewBroker[string, string, string]()
 
 	// Create a subscription to a single topic.
 	sub1 := broker.Subscribe("events")
@@ -88,7 +88,7 @@ func ExampleBroker_Subscribe() {
 }
 
 func ExampleBroker_SubscribeWithCapacity() {
-	broker := pubsub.NewBroker[string, string]()
+	broker := pubsub.NewBroker[string, string, string]()
 
 	// Create a subscription to a single topic with a specific channel capacity.
 	sub1 := broker.SubscribeWithCapacity(10, "events")
@@ -100,7 +100,7 @@ func ExampleBroker_SubscribeWithCapacity() {
 }
 
 func ExampleBroker_Unsubscribe() {
-	broker := pubsub.NewBroker[string, string]()
+	broker := pubsub.NewBroker[string, string, string]()
 
 	sub := broker.Subscribe("events", "actions", "errors")
 
@@ -113,7 +113,7 @@ func ExampleBroker_Unsubscribe() {
 }
 
 func ExampleBroker_Publish() {
-	broker := pubsub.NewBroker[string, string]()
+	broker := pubsub.NewBroker[string, string, string]()
 
 	// Publish a message to the topic concurrently.
 	//
@@ -121,7 +121,11 @@ func ExampleBroker_Publish() {
 	// or the context to be canceled.
 	//
 	// If there are no subscribers the message will be discarded.
-	err := broker.Publish(context.TODO(), "events", "Message payload to deliver")
+	err := broker.Publish(context.TODO(), Message{
+		Topic:   "events",
+		Payload: "Message payload to deliver",
+		Sender:  "sender-id", // Optional.
+	})
 
 	// A nil error is expected if the context is not canceled.
 	fmt.Println(err == nil)
@@ -129,7 +133,7 @@ func ExampleBroker_Publish() {
 }
 
 func ExampleBroker_Publish_timeout() {
-	broker := pubsub.NewBroker[string, string]()
+	broker := pubsub.NewBroker[string, string, string]()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -141,7 +145,11 @@ func ExampleBroker_Publish_timeout() {
 	//
 	// A slow consumer will not affect the other subscribers; the timeout applies
 	// individually to each subscriber.
-	err := broker.Publish(ctx, "events", "Message payload to deliver")
+	err := broker.Publish(ctx, Message{
+		Topic:   "events",
+		Payload: "Message payload to deliver",
+		Sender:  "sender-id", // Optional.
+	})
 	if err != nil {
 		// In this case 1 or more subscribers did not receive the message.
 		switch {
@@ -154,7 +162,7 @@ func ExampleBroker_Publish_timeout() {
 }
 
 func ExampleBroker_Subscribers() {
-	broker := pubsub.NewBroker[string, string]()
+	broker := pubsub.NewBroker[string, string, string]()
 	topic := "example"
 
 	for range 10 {
@@ -168,7 +176,7 @@ func ExampleBroker_Subscribers() {
 }
 
 func ExampleBroker_TryPublish() {
-	broker := pubsub.NewBroker[string, string]()
+	broker := pubsub.NewBroker[string, string, string]()
 	topic := "example"
 
 	// A subscription that will not receive the message.
@@ -179,11 +187,16 @@ func ExampleBroker_TryPublish() {
 
 	// This method will send the message to the subscribers that are ready
 	// to receive it (channel buffer not full) and the others will be skipped.
-	broker.TryPublish(topic, "abc")
+	broker.TryPublish(Message{Topic: topic, Payload: "abc", Sender: "app"})
 
 	// Receive the message on the buffered subscription.
 	msg := <-bufferedSub
 
+	fmt.Println(msg.Topic)
 	fmt.Println(msg.Payload)
-	// Output: abc
+	fmt.Println(msg.Sender)
+	// Output:
+	// example
+	// abc
+	// app
 }

@@ -10,7 +10,7 @@ import (
 )
 
 func BenchmarkBrokerSubscribe(b *testing.B) {
-	broker := pubsub.NewBroker[string, string]()
+	broker := pubsub.NewBroker[string, string, string]()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -19,7 +19,7 @@ func BenchmarkBrokerSubscribe(b *testing.B) {
 }
 
 func BenchmarkBrokerSubscribeWithCapacity(b *testing.B) {
-	broker := pubsub.NewBroker[string, string]()
+	broker := pubsub.NewBroker[string, string, string]()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -28,9 +28,9 @@ func BenchmarkBrokerSubscribeWithCapacity(b *testing.B) {
 }
 
 func BenchmarkBrokerUnsubscribe(b *testing.B) {
-	broker := pubsub.NewBroker[string, string]()
+	broker := pubsub.NewBroker[string, string, string]()
 
-	subs := make([]<-chan pubsub.Message[string, string], 0, b.N)
+	subs := make([]<-chan pubsub.Message[string, string, string], 0, b.N)
 
 	for i := 0; i < b.N; i++ {
 		sub := broker.Subscribe(strconv.Itoa(i))
@@ -49,7 +49,7 @@ func BenchmarkBrokerPublish(b *testing.B) {
 
 	for _, count := range cases {
 		b.Run(strconv.Itoa(count), func(b *testing.B) {
-			broker := pubsub.NewBroker[string, string]()
+			broker := pubsub.NewBroker[string, string, string]()
 			topic := "testing"
 
 			done := make(chan struct{})
@@ -79,7 +79,7 @@ func BenchmarkBrokerPublish(b *testing.B) {
 
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				broker.Publish(ctx, topic, strconv.Itoa(i))
+				broker.Publish(ctx, Message{Topic: topic, Payload: strconv.Itoa(i)})
 			}
 			b.StopTimer()
 
@@ -94,7 +94,7 @@ func BenchmarkBrokerTryPublish(b *testing.B) {
 
 	for _, count := range cases {
 		b.Run(strconv.Itoa(count), func(b *testing.B) {
-			broker := pubsub.NewBroker[string, string]()
+			broker := pubsub.NewBroker[string, string, string]()
 			topic := "testing"
 
 			done := make(chan struct{})
@@ -122,7 +122,7 @@ func BenchmarkBrokerTryPublish(b *testing.B) {
 
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				broker.TryPublish(topic, strconv.Itoa(i))
+				broker.TryPublish(Message{Topic: topic, Payload: strconv.Itoa(i)})
 			}
 			b.StopTimer()
 
