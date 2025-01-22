@@ -166,17 +166,24 @@ func (b *Broker[T, P, S]) Publish(ctx context.Context, msg Message[T, P, S]) err
 	default:
 		var wg sync.WaitGroup
 
-		wg.Add(len(subs))
 		for _, sub := range subs {
-			go func() {
-				defer wg.Done()
+			select {
+			case <-ctx.Done():
+			// Try to send if ready.
+			case sub <- msg:
+			// Send in a goroutine if not ready.
+			default:
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
 
-				select {
-				case <-ctx.Done():
-					return
-				case sub <- msg:
-				}
-			}()
+					select {
+					case <-ctx.Done():
+						return
+					case sub <- msg:
+					}
+				}()
+			}
 		}
 
 		wg.Wait()
