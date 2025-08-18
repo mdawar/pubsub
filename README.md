@@ -24,11 +24,11 @@ import "github.com/mdawar/pubsub"
 
 ```go
 // Create a message broker.
-// The type params are for the topic, payload and sender respectively.
-broker := pubsub.NewBroker[string, string, string]()
+// The type params are for the topic and body respectively.
+broker := pubsub.NewBroker[string, string]()
 
 // Any types can be used.
-events := pubsub.NewBroker[string, Event, int]()
+events := pubsub.NewBroker[int, Event]()
 ```
 
 #### Subscriptions
@@ -62,19 +62,18 @@ broker.Unsubscribe(sub2)
 #### Publishing Messages
 
 ```go
-// A message is composed of a topic, payload and an optional sender.
+// A message is composed of a topic and a body.
 // The type params are the same types used when creating the broker.
-var msg = pubsub.Message[string, string, string]{
+var msg = pubsub.Message[string, string]{
   Topic: "events",
-  Payload: "Sample message",
-  Sender: "sender-id",
+  Body: "Sample message",
 }
 
 // You can specify an alias for the generic message type.
-type Message = pubsub.Message[string, string, string]
+type Message = pubsub.Message[string, string]
 
-// Publish a message with the specified payload.
-// The payload can be of any type that is specified when creating the broker.
+// Publish a message with the specified body.
+// The body can be of any type that is specified when creating the broker.
 //
 // The message will be sent concurrently to the subscribers, ensuring that a slow
 // consumer won't affect the other subscribers.
@@ -85,8 +84,7 @@ type Message = pubsub.Message[string, string, string]
 // A nil return value indicates that all the subscribers received the message.
 broker.Publish(context.TODO(), Message{
   Topic: "events",
-  Payload: "Sample message",
-  Sender: "sender-id", // Optional.
+  Body: "Sample message",
 })
 ```
 
@@ -96,7 +94,7 @@ ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 defer cancel()
 // In this case, Publish will deliver the message to subscribers that are
 // ready and will wait for the others for up to the timeout duration.
-err := broker.Publish(ctx, Message{Topic: "events", Payload: "Sample message"})
+err := broker.Publish(ctx, Message{Topic: "events", Body: "Sample message"})
 // The error is not nil if the context was canceled or the deadline exceeded.
 if err != nil {
   if errors.Is(err, context.DeadlineExceeded) {
@@ -116,7 +114,7 @@ if err != nil {
 // NOTE: Message delivery is not guaranteed.
 broker.TryPublish(Message{
   Topic: "events",
-  Payload: "A message that may not be delivered",
+  Body: "A message that may not be delivered",
 })
 
 // Buffered subscriptions can be used for guaranteed delivery with a non-blocking publish.
@@ -126,7 +124,7 @@ broker.TryPublish(Message{
 sub := broker.SubscribeWithCapacity(1, "events")
 broker.Publish(context.TODO(), Message{
   Topic: "events",
-  Payload: "Guaranteed delivery message",
+  Body: "Guaranteed delivery message",
 })
 ```
 
@@ -140,10 +138,8 @@ msg := <-sub
 
 // The topic that the message was published on.
 msg.Topic
-// The payload that was published using Publish() or TryPublish().
-msg.Payload
-// The message sender.
-msg.Sender
+// The body that was published using Publish() or TryPublish().
+msg.Body
 ```
 
 #### Topics

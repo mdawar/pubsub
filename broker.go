@@ -7,13 +7,11 @@ import (
 )
 
 // Message represents a message delivered by the broker to a subscriber.
-type Message[T any, P any, S any] struct {
+type Message[T any, B any] struct {
 	// Topic is the topic on which the message is published.
 	Topic T
-	// Payload holds the published value.
-	Payload P
-	// Sender is an identifier for the message's sender.
-	Sender S
+	// Body holds the message body.
+	Body B
 }
 
 // Broker represents a message broker.
@@ -23,17 +21,17 @@ type Message[T any, P any, S any] struct {
 // of messages to specific topics.
 //
 // The Broker supports concurrent operations.
-type Broker[T comparable, P any, S any] struct {
+type Broker[T comparable, B any] struct {
 	// Mutex to protect the subs map.
 	mu sync.RWMutex
 	// subs holds the topics and their subscriptions as a slice.
-	subs map[T][]chan Message[T, P, S]
+	subs map[T][]chan Message[T, B]
 }
 
 // NewBroker creates a new message [Broker] instance.
-func NewBroker[T comparable, P any, S any]() *Broker[T, P, S] {
-	return &Broker[T, P, S]{
-		subs: make(map[T][]chan Message[T, P, S]),
+func NewBroker[T comparable, B any]() *Broker[T, B] {
+	return &Broker[T, B]{
+		subs: make(map[T][]chan Message[T, B]),
 	}
 }
 
@@ -42,7 +40,7 @@ func NewBroker[T comparable, P any, S any]() *Broker[T, P, S] {
 // A nil slice is returned if there are no topics.
 //
 // NOTE: The order of the topics is not guaranteed.
-func (b *Broker[T, P, S]) Topics() []T {
+func (b *Broker[T, B]) Topics() []T {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
@@ -56,14 +54,14 @@ func (b *Broker[T, P, S]) Topics() []T {
 }
 
 // NumTopics returns the total number of topics registered on the [Broker].
-func (b *Broker[T, P, S]) NumTopics() int {
+func (b *Broker[T, B]) NumTopics() int {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	return len(b.subs)
 }
 
 // Subscribers returns the number of subscriptions on the specified topic.
-func (b *Broker[T, P, S]) Subscribers(topic T) int {
+func (b *Broker[T, B]) Subscribers(topic T) int {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	return len(b.subs[topic])
@@ -72,18 +70,18 @@ func (b *Broker[T, P, S]) Subscribers(topic T) int {
 // Subscribe creates a subscription for the specified topics.
 //
 // The created subscription channel is unbuffered (capacity = 0).
-func (b *Broker[T, P, S]) Subscribe(topics ...T) <-chan Message[T, P, S] {
+func (b *Broker[T, B]) Subscribe(topics ...T) <-chan Message[T, B] {
 	return b.SubscribeWithCapacity(0, topics...)
 }
 
 // Subscribe creates a subscription for the specified topics with the specified capacity.
 //
 // The capacity specifies the subscription channel's buffer capacity.
-func (b *Broker[T, P, S]) SubscribeWithCapacity(capacity int, topics ...T) <-chan Message[T, P, S] {
+func (b *Broker[T, B]) SubscribeWithCapacity(capacity int, topics ...T) <-chan Message[T, B] {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	sub := make(chan Message[T, P, S], capacity)
+	sub := make(chan Message[T, B], capacity)
 
 	for _, topic := range topics {
 		b.subs[topic] = append(b.subs[topic], sub)
@@ -99,7 +97,7 @@ func (b *Broker[T, P, S]) SubscribeWithCapacity(capacity int, topics ...T) <-cha
 // The channel will not be closed, it will only stop receiving messages.
 //
 // NOTE: Specifying the topics to unsubscribe from can be more efficient.
-func (b *Broker[T, P, S]) Unsubscribe(sub <-chan Message[T, P, S], topics ...T) {
+func (b *Broker[T, B]) Unsubscribe(sub <-chan Message[T, B], topics ...T) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -120,7 +118,7 @@ func (b *Broker[T, P, S]) Unsubscribe(sub <-chan Message[T, P, S], topics ...T) 
 // removeSubscription removes a subscription channel from a topic.
 //
 // The topic will be removed if there are no other subscriptions.
-func (b *Broker[T, P, S]) removeSubscription(sub <-chan Message[T, P, S], topic T) {
+func (b *Broker[T, B]) removeSubscription(sub <-chan Message[T, B], topic T) {
 	subscribers := b.subs[topic]
 	for i, s := range subscribers {
 		if s == sub {
@@ -135,7 +133,7 @@ func (b *Broker[T, P, S]) removeSubscription(sub <-chan Message[T, P, S], topic 
 	}
 }
 
-// Publish publishes a [Message] to the topic with the specified payload.
+// Publish publishes a [Message] to the topic with the specified body.
 //
 // The message is sent concurrently to the subscribers, ensuring that a slow
 // consumer won't affect the other subscribers.
@@ -148,11 +146,10 @@ func (b *Broker[T, P, S]) removeSubscription(sub <-chan Message[T, P, S], topic 
 // A nil return value indicates that all the subscribers received the message.
 //
 // If there are no subscribers to the topic, the message will be discarded.
-func (b *Broker[T, P, S]) Publish(ctx context.Context, msg Message[T, P, S]) error {
+func (b *Broker[T, B]) Publish(ctx context.Context, msg Message[T, B]) error {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
-	// TODO: add test for empty topic.
 	subs := b.subs[msg.Topic]
 
 	switch len(subs) {
@@ -192,21 +189,20 @@ func (b *Broker[T, P, S]) Publish(ctx context.Context, msg Message[T, P, S]) err
 	return ctx.Err()
 }
 
-// TryPublish publishes a message to the topic with the specified payload if the subscription's
+// TryPublish publishes a message to the topic with the specified body if the subscription's
 // channel buffer is not full.
 //
 // The message is sent sequentially to the subscribers that are ready to receive it and the others
 // are skipped.
 //
 // NOTE: Use the [Broker.Publish] method for guaranteed delivery.
-func (b *Broker[T, P, S]) TryPublish(msg Message[T, P, S]) {
+func (b *Broker[T, B]) TryPublish(msg Message[T, B]) {
 	b.mu.RLock()
-	defer b.mu.RUnlock()
-
 	for _, sub := range b.subs[msg.Topic] {
 		select {
 		case sub <- msg:
 		default:
 		}
 	}
+	b.mu.RUnlock()
 }
